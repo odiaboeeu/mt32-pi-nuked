@@ -48,7 +48,7 @@ The Raspberry Pi 4 port uses optimization work derived from the [J.C. Moyer Nuke
 - Added exact Nuked-MT32 Control ROM selection for versions 1.04, 1.05, 1.06, 1.07, 2.04, 2.06, and 2.07.
 - Kept Munt, FluidSynth, Nuked-SC55, and Nuked-MT32 available in the same firmware.
 - Disabled automatic creation of `sc55.log` on the SD card.
-- Updated the development base to Circle Step 51, FluidSynth 2.6.1, and Munt 2.8.3.
+- Updated the development base to Circle Step 51, FluidSynth 2.6.1, and Munt 2.8.2.
 
 Always check the recorded submodule commits in the branch being built, because dependency revisions may change as the development branch evolves.
 
@@ -405,7 +405,7 @@ This development branch includes integration work for newer project revisions th
 
 - Circle Step 51
 - FluidSynth 2.6.1
-- Munt 2.8.3
+- Munt 2.8.2
 
 Circle provides the Raspberry Pi bare-metal runtime, drivers, multicore support, filesystems, USB, audio, and other platform services. FluidSynth provides SoundFont synthesis. Munt provides the established MT-32 family emulation backend and also supplies the reverb implementation used as a substitute by this Nuked-MT32 port.
 

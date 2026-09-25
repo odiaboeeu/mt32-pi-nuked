@@ -10,7 +10,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v4.5.0
         with:
@@ -39,9 +39,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: [pi2, pi3-64, pi4-64]
+        board: [pi4-64]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Fetch submodules
       run: make submodules
@@ -53,7 +53,7 @@ jobs:
 
     - name: Cache ARM toolchains
       id: cache-toolchains
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/arm-gnu-toolchain-${{ env.toolchain-version }}-x86_64-arm-none-eabi
@@ -82,18 +82,18 @@ jobs:
       run: make -j BOARD=${{ matrix.board }}
 
     - name: Upload built kernel
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: kernels
+        name: kernels-pi4-64
         path: kernel*.img
 
     - name: Build (HDMI console)
       run: make clean && make -j BOARD=${{ matrix.board }} HDMI_CONSOLE=1
 
     - name: Upload built kernel
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: kernels-hdmi
+        name: kernels-hdmi-pi4-64
         path: kernel*.img
 
   package:
@@ -104,14 +104,14 @@ jobs:
       wlan-home: external/circle-stdlib/libs/circle/addon/wlan
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Fetch submodules
       run: make submodules
 
     - name: Cache boot files
       id: cache-boot-files
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           sdcard/armstub8-rpi4.bin
@@ -129,14 +129,14 @@ jobs:
 
     - name: Cache WLAN firmware
       id: cache-wlan-firmware
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: sdcard/firmware
         key: cache-wlan-firmware-${{ hashFiles(join(env.wlan-home, '/firmware/Makefile')) }}
 
     - name: Cache ARM toolchains
       if: steps.cache-boot-files.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/arm-gnu-toolchain-${{ env.toolchain-version }}-x86_64-arm-none-eabi
@@ -188,7 +188,7 @@ jobs:
 
     - name: Cache GeneralUser GS SoundFont
       id: cache-generaluser-gs
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: GeneralUser GS v1.511
         key: cache-generaluser-gs-1.511
@@ -201,9 +201,9 @@ jobs:
         unzip "GeneralUser GS v1.511.zip"
 
     - name: Retrieve built kernels
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
-        name: kernels
+        name: kernels-pi4-64
         path: sdcard
 
     - name: Add extra files to SD card directory
@@ -216,7 +216,7 @@ jobs:
         cp README.md sdcard/docs
 
     - name: Upload SD card archive
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sdcard
         path: sdcard
