@@ -122,7 +122,9 @@ CMT32Pi::CMT32Pi(CI2CMaster* pI2CMaster, CSPIMaster* pSPIMaster, CInterruptSyste
 	  m_pMT32Synth(nullptr),
 	  m_pNukedMT32Synth(nullptr),
 	  m_pSoundFontSynth(nullptr),
-        m_pSC55Synth(nullptr)
+        m_pSC55Synth(nullptr),
+        m_bSC55InitializationError(false),
+        m_SC55InitializationErrorModel(TSC55Model::MK2)
 {
 	s_pThis = this;
 }
@@ -486,6 +488,11 @@ bool CMT32Pi::InitSC55Synth()
         if (!m_pSC55Synth->Initialize())
         {
                 LOGWARN("Nuked-SC55 init failed; ROMs present?");
+
+                m_bSC55InitializationError = true;
+                m_SC55InitializationErrorModel =
+                        m_pConfig->SC55Model;
+
                 delete m_pSC55Synth;
                 m_pSC55Synth = nullptr;
                 return false;
@@ -503,6 +510,28 @@ void CMT32Pi::MainTask()
 	LOGNOTE("Main task on Core 0 starting up");
 
 	Awaken();
+
+
+    if (m_bSC55InitializationError)
+    {
+            if (
+                    m_SC55InitializationErrorModel ==
+                    TSC55Model::MK1
+            )
+            {
+                    m_UserInterface.ShowSystemMessage(
+                            "SC55 MkI ROM error"
+                    );
+            }
+            else
+            {
+                    m_UserInterface.ShowSystemMessage(
+                            "SC55 MkII ROM error"
+                    );
+            }
+
+            m_bSC55InitializationError = false;
+    }
 
 	while (m_bRunning)
 	{

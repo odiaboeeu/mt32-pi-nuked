@@ -221,6 +221,9 @@ private:
 	CSoundFontSynth* m_pSoundFontSynth;
         CSC55Synth* m_pSC55Synth;
 
+        bool m_bSC55InitializationError;
+        TSC55Model m_SC55InitializationErrorModel;
+
 	// MIDI receive buffer
 	CRingBuffer<u8, MIDIRxBufferSize> m_MIDIRxBuffer;
 
