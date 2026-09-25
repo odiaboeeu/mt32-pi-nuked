@@ -444,6 +444,12 @@ At the time this README was prepared:
 
 This README is informational and is not legal advice. The license texts included with the source code are authoritative.
 
+## Project maintenance
+
+mt32-pi-nuked is currently maintained by [odiaboeeu](https://github.com/odiaboeeu).
+
+The contributors shown by GitHub include authors from the preserved mt32-pi commit history. Their presence in the contributors list does not imply current maintenance responsibility, project endorsement, or administrative access to this repository.
+
 ## Credits and acknowledgments
 
 This project exists because of the work of many developers and contributors.
