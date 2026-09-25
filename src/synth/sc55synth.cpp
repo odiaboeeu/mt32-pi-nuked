@@ -256,6 +256,25 @@ bool CSC55Synth::LoadROMFile(const char* pPath, u8*& pOutData, unsigned int& nOu
         return true;
 }
 
+static bool ValidateSC55ROMSize(
+        const char* pPath,
+        unsigned int nActualSize,
+        unsigned int nExpectedSize
+)
+{
+        if (nActualSize == nExpectedSize)
+                return true;
+
+        LOGERR(
+                "Invalid ROM size for %s: %u bytes, expected %u",
+                pPath,
+                nActualSize,
+                nExpectedSize
+        );
+
+        return false;
+}
+
 bool CSC55Synth::Initialize()
 {
         u8* pROM1 = nullptr;
@@ -302,6 +321,36 @@ bool CSC55Synth::Initialize()
                                 pWaveROM3,
                                 nWaveROM3Size
                         );
+
+                if (bOK)
+                {
+                        bOK =
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk1/rom1.bin",
+                                        nROM1Size,
+                                        32U * 1024U
+                                ) &&
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk1/rom2.bin",
+                                        nROM2Size,
+                                        256U * 1024U
+                                ) &&
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk1/waverom1.bin",
+                                        nWaveROM1Size,
+                                        1024U * 1024U
+                                ) &&
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk1/waverom2.bin",
+                                        nWaveROM2Size,
+                                        1024U * 1024U
+                                ) &&
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk1/waverom3.bin",
+                                        nWaveROM3Size,
+                                        1024U * 1024U
+                                );
+                }
 
                 if (bOK)
                 {
@@ -354,6 +403,36 @@ bool CSC55Synth::Initialize()
                                 pROMSM,
                                 nROMSMSize
                         );
+
+                if (bOK)
+                {
+                        bOK =
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk2/rom1.bin",
+                                        nROM1Size,
+                                        32U * 1024U
+                                ) &&
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk2/rom2.bin",
+                                        nROM2Size,
+                                        512U * 1024U
+                                ) &&
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk2/waverom1.bin",
+                                        nWaveROM1Size,
+                                        2U * 1024U * 1024U
+                                ) &&
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk2/waverom2.bin",
+                                        nWaveROM2Size,
+                                        1024U * 1024U
+                                ) &&
+                                ValidateSC55ROMSize(
+                                        "roms/sc55/mk2/rom_sm.bin",
+                                        nROMSMSize,
+                                        4U * 1024U
+                                );
+                }
 
                 if (bOK)
                 {
