@@ -19,13 +19,6 @@
 
 LOGMODULE("sc55synth");
 
-static void SC55SDLog(const char* pMessage)
-{
-}
-
-
-
-
 extern "C"
 {
         int SC55_HeadlessLoadMk2RomSetFromMemory(
@@ -228,7 +221,6 @@ bool CSC55Synth::LoadROMFile(const char* pPath, u8*& pOutData, unsigned int& nOu
         if (Result != FR_OK)
         {
                 LOGERR("Failed to open ROM: %s", pPath);
-                SC55SDLog("SC55 Failed to open ROM");
                 return false;
         }
 
@@ -236,7 +228,6 @@ bool CSC55Synth::LoadROMFile(const char* pPath, u8*& pOutData, unsigned int& nOu
         if (nSize == 0)
         {
                 LOGERR("Empty ROM: %s", pPath);
-                SC55SDLog("SC55 Empty ROM");
                 f_close(&File);
                 return false;
         }
@@ -245,7 +236,6 @@ bool CSC55Synth::LoadROMFile(const char* pPath, u8*& pOutData, unsigned int& nOu
         if (!pOutData)
         {
             LOGERR("Failed to allocate ROM buffer: %s", pPath);
-            SC55SDLog("SC55 Failed to allocate ROM buffer");
             f_close(&File);
             return false;
         }
@@ -257,33 +247,17 @@ bool CSC55Synth::LoadROMFile(const char* pPath, u8*& pOutData, unsigned int& nOu
         if (Result != FR_OK || nRead != nSize)
         {
                 LOGERR("Failed to read ROM: %s", pPath);
-                SC55SDLog("SC55 Failed to read ROM");
                 FreeROMBuffer(pOutData);
                 return false;
         }
 
         nOutSize = static_cast<unsigned int>(nSize);
         LOGNOTE("Loaded ROM %s (%u bytes)", pPath, nOutSize);
-        SC55SDLog("SC55 Loaded ROM");
         return true;
 }
 
 bool CSC55Synth::Initialize()
 {
-        SC55SDLog("SC55 Initialize begin");
-
-        if (m_nSampleRate == 32000)
-                SC55SDLog("SC55 sample rate 32000");
-        else if (m_nSampleRate == 48000)
-                SC55SDLog("SC55 sample rate 48000");
-        else
-                SC55SDLog("SC55 sample rate other");
-
-        if (m_nNativeSampleRate == 64000)
-                SC55SDLog("SC55 native rate 64000");
-        else
-                SC55SDLog("SC55 native rate 66207");
-
         u8* pROM1 = nullptr;
         u8* pROM2 = nullptr;
         u8* pWaveROM1 = nullptr;
@@ -349,7 +323,6 @@ bool CSC55Synth::Initialize()
                                 LOGERR(
                                         "SC55_HeadlessLoadMk1RomSetFromMemory failed"
                                 );
-                                SC55SDLog("SC55 LoadMk1 failed");
                         }
                 }
         }
@@ -402,7 +375,6 @@ bool CSC55Synth::Initialize()
                                 LOGERR(
                                         "SC55_HeadlessLoadMk2RomSetFromMemory failed"
                                 );
-                                SC55SDLog("SC55 LoadMk2 failed");
                         }
                 }
         }
@@ -420,7 +392,6 @@ bool CSC55Synth::Initialize()
         if (!SC55_HeadlessOpenAudio(512, 64))
         {
                 LOGERR("SC55_HeadlessOpenAudio failed");
-                SC55SDLog("SC55 OpenAudio failed");
                 return false;
         }
 
@@ -442,7 +413,6 @@ bool CSC55Synth::Initialize()
         else
                 LOGNOTE("Experimental Nuked-SC55mkII initialized");
 
-        SC55SDLog("SC55 initialized OK");
         return true;
 }
 
