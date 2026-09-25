@@ -1,157 +1,473 @@
-## Please note
+# mt32-pi-nuked
 
-**It's unlikely that there will be any further releases of mt32-pi.**
+This is an independent community-maintained derivative of mt32-pi. It is not an official mt32-pi, Nuked-SC55, Nuked-MT32, Munt, or FluidSynth release.
 
-I have endured a sustained campaign of abuse from members of the VOGONS forum, been labelled a "clout-chaser", had threats sent to my personal email address, code been used in other projects without proper accreditation, my 3D print designs stolen and sold by faceless eBay/Etsy sellers, personal attacks made towards me when people don't get their feature request... the list goes on and on.
+The project is maintained as **mt32-pi-nuked** and extends [mt32-pi](https://github.com/dwhinham/mt32-pi) with bare-metal ports of [Nuked-SC55](https://github.com/nukeykt/Nuked-SC55) and [Nuked-MT32](https://github.com/nukeykt/Nuked-MT32), while preserving the original Munt and FluidSynth backends.
 
-*There is only so much I can take.*
+The current target is the **Raspberry Pi 4 in 64-bit mode**. The result is a single mt32-pi firmware that can switch between four synthesizer backends:
 
-My mental health has been in decline as a direct result of this behavior; the joy of working on this project has pretty much gone. There is nothing to be gained from putting time and hard work into it any more. There is no gratitude, no encouragement - just entitled behavior and grift.
+- Munt
+- FluidSynth
+- Nuked-SC55
+- Nuked-MT32
 
-To those who supported this project in the past, especially whilst I was a struggling student who needed all the uplift I could get, thank you sincerely.
+This work is an integration and port of existing emulators. It is not a replacement for, or an official release of, the upstream projects.
 
----
+## Important status notes
 
-[![mt32-pi CI](https://github.com/dwhinham/mt32-pi/workflows/mt32-pi%20CI/badge.svg)](https://github.com/dwhinham/mt32-pi/actions?query=workflow:"mt32-pi+CI")
+### Raspberry Pi 4 is the supported target
 
-<h1 align="center">
-    <img width="90%" title="mt32-pi - Baremetal synthesizer system" src="images/mt32pi_logo.svg">
-</h1>
+This development branch is intended for the Raspberry Pi 4. Nuked-SC55 is especially CPU-intensive because it emulates the original processors and PCM hardware at a low level.
 
-- A work-in-progress baremetal MIDI synthesizer for the Raspberry Pi 3 or above, based on [Munt], [FluidSynth] and [Circle].
-- Turn your Raspberry Pi into a dedicated emulation of the [famous multi-timbre sound module][Roland MT-32] used by countless classic MS-DOS, PC-98 and Sharp X68000 games!
-- Add your favorite [SoundFonts][SoundFont] to expand your synthesizer with [General MIDI], [Roland GS], or even [Yamaha XG] support for endless MIDI possibilities.
-- Includes General MIDI and Roland GS support out of the box thanks to [GeneralUser GS] by S. Christian Collins.
-- No operating system, no complex Linux audio configuration; just super-low latency audio.
-- Easy to configure and ready to play from cold-boot in a matter of seconds.
-- The perfect companion for your vintage PC or [MiSTer FPGA] setup.
+A Raspberry Pi 3 was tested during development, but it does not provide enough processing performance to run Nuked-SC55 reliably, even after the optimizations attempted for this port. Munt, FluidSynth, and some less demanding configurations may still work on earlier boards, but the complete four-module firmware described here should be treated as a Raspberry Pi 4 build.
 
----
+Raspberry Pi 5 support has not been validated by this project.
 
-## ✔️ Project status
+### Nuked-MT32 is incomplete upstream
 
-<img title="mt32-pi running on the Raspberry Pi 3 A+ with the Arananet PI-MIDI HAT." width="280rem" align="right" src="images/mt32pi_pimidi.png">
+Nuked-MT32 was released by its original developer as unfinished software. The original project does not emulate the MT-32 reverb chip because no decap of that chip is available.
 
-- Supports Raspberry Pi Zero 2 W, Raspberry Pi 3 Model A+, B, and B+, Raspberry Pi 4 Model B, and CM4 series.
-  * Pi 2 works, but only with concessions on playback quality.
-  * Pi Zero (original) and Pi 1 are unfortunately too slow (even with an overclock) and unsupported.
-- PWM headphone jack audio.
-  * Quality is known to be poor (aliasing/distortion on quieter sounds).
-  * It is not currently known whether this can be improved or not.
-- [I²S Hi-Fi DAC support][I²S Hi-Fi DACs].
-  * This is the recommended audio output method for the best quality audio.
-- MIDI input via [USB][USB MIDI interfaces], [GPIO][GPIO MIDI interface] MIDI interfaces, or the [serial port].
-- [Configuration file] for selecting hardware options and fine tuning.
-- [LCD status screen support][LCD and OLED displays] (for MT-32 SysEx messages and status information).
-- Simple [physical control surface][control surface] using buttons and rotary encoder.
-- [MiSTer FPGA integration via user port][MiSTer FPGA].
-- Network MIDI support via [RTP-MIDI] and [raw UDP socket].
-- [Embedded FTP server][FTP server] for remote access to files.
-- A user interface with menu system is _planned_.
-- More advanced MIDI routing is _planned_.
+This port uses the Munt-based reverb implementation found in the [keithadler GitHub account](https://github.com/keithadler) development line as a practical substitute. Consequently, the MT-32 digital synthesis path is based on Nuked-MT32, while reverb is not a transistor-level emulation of the original MT-32 reverb chip.
 
-## ✨ Quick-start guide
+### Nuked-SC55 performance work
 
-🆕 If you have a Linux computer or MiSTer FPGA device, you may wish to try the new interactive [mt32-pi installer script](scripts).
+The Raspberry Pi 4 port uses optimization work derived from the [J.C. Moyer Nuked-SC55 fork](https://github.com/jcmoyer/Nuked-SC55). Without that optimization work, the SC-55 backend was not practical on the Raspberry Pi 4 in this bare-metal integration.
 
-Otherwise, for a manual installation:
+## Main changes in this fork
 
-1. Download the latest release from the [Releases] section.
-    * If you are **updating an old version**, read the [Updating mt32-pi] wiki page for the correct procedure.
-2. Extract contents to a blank [FAT32-formatted SD card][SD card preparation].
-    * Read the [SD card preparation] wiki page for hints on formatting an SD card correctly (especially under Windows).
-3. For MT-32 support, add your MT-32 or CM-32L ROM images to the `roms` directory - you have to provide these for copyright reasons.
-    * You will need at least one control ROM and one PCM ROM.
-    * For information on using multiple ROM sets and switching between them, see the [MT-32 synthesis] wiki page.
-    * The file names or extensions don't matter; mt32-pi will scan and detect their types automatically.
-4. Optionally add your favorite SoundFonts to the `soundfonts` directory.
-    * For information on using multiple SoundFonts and switching between them, see the [SoundFont synthesis] wiki page.
-    * Again, file names/extensions don't matter.
-5. Edit the `mt32-pi.cfg` file to enable any optional hardware (Hi-Fi DAC, displays, buttons). Refer to [the wiki][mt32-pi wiki] to find supported hardware.
-    * **MiSTer users**: Read the [MiSTer setup] section of the wiki for the recommended configuration, and ignore the following two steps.
-6. Connect a [USB MIDI interface][USB MIDI interfaces] or [GPIO MIDI circuit][GPIO MIDI interface] to the Pi, and connect some speakers to the headphone jack.
-7. Connect your vintage PC's MIDI OUT to the Pi's MIDI IN and (optionally) vice versa.
+- Added a bare-metal Nuked-SC55 backend.
+- Added SC-55 MkI and SC-55 MkII model selection.
+- Added a dedicated producer path for Nuked-SC55 audio generation.
+- Added a bare-metal Nuked-MT32 backend.
+- Added native Nuked-MT32 audio rendering and resampling from 32 kHz to the configured system sample rate.
+- Added MIDI short-message and SysEx handling for Nuked-MT32.
+- Added Nuked-MT32 master-volume control through Roland SysEx.
+- Added firmware LCD text, active-part indicators, and nine-part level meters for Nuked-MT32.
+- Added standard and alternate MT-32 MIDI channel assignments.
+- Added independent reversed-stereo configuration for Nuked-MT32.
+- Added exact Nuked-MT32 Control ROM selection for versions 1.04, 1.05, 1.06, 1.07, 2.04, 2.06, and 2.07.
+- Kept Munt, FluidSynth, Nuked-SC55, and Nuked-MT32 available in the same firmware.
+- Disabled automatic creation of `sc55.log` on the SD card.
+- Updated the development base to Circle Step 51, FluidSynth 2.6.1, and Munt 2.8.3.
 
-## 📚 Documentation
+Always check the recorded submodule commits in the branch being built, because dependency revisions may change as the development branch evolves.
 
-More detailed documentation for mt32-pi can now be found over at the [mt32-pi wiki]. Please read the wiki pages to learn about all of mt32-pi's features and supported hardware, and consider helping us improve it!
+## Required hardware
 
-## ❓ Help
+- Raspberry Pi 4
+- A reliable power supply appropriate for the Raspberry Pi 4 and attached hardware
+- FAT32-formatted SD card
+- Supported audio output, preferably a compatible I2S DAC
+- MIDI input through USB, GPIO MIDI, serial MIDI, or the MiSTer user-port solution supported by mt32-pi
+- Optional supported LCD or OLED display
 
-Take a look at our [FAQ] page for answers to the most common questions about mt32-pi.
+## Power warning for MiSTer user-port HAT users
 
-If you need some help with mt32-pi and the wiki doesn't answer your questions, head over to the [discussions] area and feel free to start a topic.
+A Raspberry Pi 4 generally requires more power than the Raspberry Pi 3-class boards commonly used with earlier mt32-pi installations.
 
-> ⚠ **Note**: Please don't use the Issues area to ask for help - Issues are intended for reproducible bug reports and feature requests. Thank you!
+If a HAT obtains power through the MiSTer user port, confirm that the HAT, cable, MiSTer power supply, and power path can safely provide the required current. An insufficient or unstable supply may cause undervoltage, throttling, audio interruptions, lockups, failed USB initialization, corrupted SD-card writes, or unexpected resets.
 
-## ❤️ Contributing
+If stability problems occur:
 
-This project is generally quite stable and very usable, but still considered by its author to be in early stages of development.
+1. Test the Raspberry Pi 4 with a known-good dedicated power supply.
+2. Check the mt32-pi display or log output for undervoltage or CPU-throttling warnings.
+3. Avoid assuming that a setup stable with a Raspberry Pi 3 will automatically be stable with a Raspberry Pi 4.
+4. Verify the electrical design and documentation of the specific HAT before powering the Raspberry Pi 4 through the MiSTer user port.
 
-Hence, please **DO NOT** work on large features and open pull requests without prior discussion. There is a strong possibility that work-in-progress code for proposed features already exists, but may not yet be public, and your work will have to be rejected.
+## SD-card layout
 
-Trivial changes to the code that fix issues are always welcome, as are improvements to documentation, and hardware/software compatibility reports.
+A typical card layout is:
 
-## ⚖️ License
+```text
+/
+├── kernel8.img
+├── mt32-pi.cfg
+├── roms/
+│   ├── pcm_mt32.rom
+│   ├── mt32_1_04_control.rom
+│   ├── mt32_1_05_control.rom
+│   ├── mt32_1_06_control.rom
+│   ├── mt32_1_07_control.rom
+│   ├── mt32_2_04_control.rom
+│   ├── mt32_2_06_control.rom
+│   ├── mt32_2_07_control.rom
+│   ├── ctrl_cm32l_1_00.rom
+│   ├── ctrl_cm32l_1_02.rom
+│   ├── pcm_cm32l.rom
+│   └── sc55/
+│       ├── rom1.bin
+│       ├── rom2.bin
+│       ├── rom_sm.bin
+│       ├── waverom1.bin
+│       ├── waverom2.bin
+│       ├── sc55_rom1.bin
+│       ├── sc55_rom2.bin
+│       ├── sc55_waverom1.bin
+│       ├── sc55_waverom2.bin
+│       └── sc55_waverom3.bin
+└── soundfonts/
+    └── your-soundfont.sf2
+```
 
-This project's source code is licensed under the [GNU General Public License v3.0][license].
+Only install ROM images legally obtained from hardware you own or from another source that you are legally permitted to use. ROM images are not included with this project.
 
-The [mt32-pi logo] was designed by and is © Dale Whinham. The terms of use for the logo are as follows:
+## Nuked-SC55 ROM files
 
-- The logo **MAY** be used on open-source community hardware.
-- The logo **MAY** be used to link back to this repository or for similar promotional purposes of a strictly **non-commercial nature** (e.g. blog posts, social media, YouTube videos).
-- The logo **MUST NOT** be used on or for the marketing of closed-source or commercial hardware (e.g. case designs, PCBs), without express permission.
-- The logo **MUST NOT** be used for any other commercial products or purposes without express permission.
-- The shape and overall design of the logo **MUST NOT** be modified or distorted. You **MAY** change the colors if required.
-- If in any doubt, please ask. Thank you.
+The integrated backend currently focuses on SC-55 MkI and SC-55 MkII operation.
 
-## 🙌 Acknowledgments
+### SC-55 MkII
 
-- Many thanks go out to @rc55 and @nswaldman for their encouragement and testing! ❤️
-- A huge thank you to everyone who has donated via Ko-fi, PayPal, or Amazon - your support means a lot! ❤️
-- Special thanks to [Edu Arana (Arananet)], [Porkchop Express (MiSTerAddons)], @djhardrich, [Nat (MiSTerFPGA.co.uk)], [Ricardo Saraiva (UltimateMiSTer.com)], [Serge Defever (Serdashop)], and @opjose who have all generously donated hardware to the project.
-- The [Munt] team for their incredible work reverse-engineering the Roland MT-32 and producing an excellent emulation and well-structured project.
-- The [FluidSynth] team for their excellent and easily-portable SoundFont synthesizer project.
-- [S. Christian Collins][GeneralUser GS] for the excellent GeneralUser GS SoundFont and for kindly giving permission to include it in the project.
-- The [Circle] and [circle-stdlib] projects for providing the best C++ baremetal framework for the Raspberry Pi.
-- The [inih] project for a nice, lightweight config file parser.
+Place these files in the SC-55 ROM directory used by the build:
 
-[Changelog]: https://github.com/dwhinham/mt32-pi/blob/master/CHANGELOG.md
-[circle-stdlib]: https://github.com/smuehlst/circle-stdlib
-[Circle]: https://github.com/rsta2/circle
-[Configuration file]: https://github.com/dwhinham/mt32-pi/wiki/Configuration-file
-[Control surface]: https://github.com/dwhinham/mt32-pi/wiki/Control-surface
-[Discussions]: https://github.com/dwhinham/mt32-pi/discussions
-[Edu Arana (Arananet)]: https://www.arananet.net/pedidos
-[FAQ]: https://github.com/dwhinham/mt32-pi/wiki/FAQ
-[FluidSynth]: http://www.fluidsynth.org
-[FTP server]: https://github.com/dwhinham/mt32-pi/wiki/Embedded-FTP-server
-[General MIDI]: https://en.wikipedia.org/wiki/General_MIDI
-[GeneralUser GS]: http://schristiancollins.com/generaluser.php
-[GPIO MIDI interface]: https://github.com/dwhinham/mt32-pi/wiki/GPIO-MIDI-interface
-[I²S Hi-Fi DACs]: https://github.com/dwhinham/mt32-pi/wiki/I%C2%B2S-DACs
-[inih]: https://github.com/benhoyt/inih
-[LCD and OLED displays]: https://github.com/dwhinham/mt32-pi/wiki/LCD-and-OLED-displays
-[License]: https://github.com/dwhinham/mt32-pi/blob/master/LICENSE
-[MiSTer FPGA]: https://github.com/dwhinham/mt32-pi/wiki/MiSTer-FPGA
-[MiSTer setup]: https://github.com/dwhinham/mt32-pi/wiki/MiSTer-FPGA%3A-Setup-and-usage
-[MT-32 synthesis]: https://github.com/dwhinham/mt32-pi/wiki/MT-32-synthesis
-[mt32-pi logo]: https://github.com/dwhinham/mt32-pi/blob/master/images/mt32pi_logo.svg
-[mt32-pi wiki]: https://github.com/dwhinham/mt32-pi/wiki
-[Munt]: https://github.com/munt/munt
-[Nat (MiSTerFPGA.co.uk)]: https://misterfpga.co.uk
-[Porkchop Express (MiSTerAddons)]: https://misteraddons.com
-[Releases]: https://github.com/dwhinham/mt32-pi/releases
-[Ricardo Saraiva (UltimateMiSTer.com)]: https://ultimatemister.com
-[Roland GS]: https://en.wikipedia.org/wiki/Roland_GS
-[Roland MT-32]: https://en.wikipedia.org/wiki/Roland_MT-32
-[RTP-MIDI]: https://github.com/dwhinham/mt32-pi/wiki/Networking%3A-RTP-MIDI-%28AppleMIDI%29
-[Raw UDP socket]: https://github.com/dwhinham/mt32-pi/wiki/Networking%3A-UDP-MIDI
-[SD card preparation]: https://github.com/dwhinham/mt32-pi/wiki/SD-card-preparation
-[Serge Defever (Serdashop)]: http://serdashop.com
-[Serial port]: https://github.com/dwhinham/mt32-pi/wiki/MIDI-via-RS-232-or-USB-to-serial
-[SoundFont synthesis]: https://github.com/dwhinham/mt32-pi/wiki/SoundFont-synthesis
-[SoundFont]: https://en.wikipedia.org/wiki/SoundFont
-[Updating mt32-pi]: https://github.com/dwhinham/mt32-pi/wiki/Updating-mt32-pi
-[USB MIDI interfaces]: https://github.com/dwhinham/mt32-pi/wiki/USB-MIDI-interfaces
-[Yamaha XG]: https://en.wikipedia.org/wiki/Yamaha_XG
+```text
+rom1.bin
+rom2.bin
+rom_sm.bin
+waverom1.bin
+waverom2.bin
+```
+
+The upstream Nuked-SC55 documentation associates these files with:
+
+```text
+rom1.bin      H8/532 MCU firmware
+rom2.bin      H8/532 extra code
+rom_sm.bin    M37450M2 sub-MCU firmware
+waverom1.bin  16 Mbit wave ROM
+waverom2.bin  8 Mbit wave ROM
+```
+
+### SC-55 MkI
+
+Place these files in the SC-55 ROM directory:
+
+```text
+sc55_rom1.bin
+sc55_rom2.bin
+sc55_waverom1.bin
+sc55_waverom2.bin
+sc55_waverom3.bin
+```
+
+The specific MkI firmware revision depends on the ROM images supplied by the user. Refer to the upstream Nuked-SC55 documentation for known firmware revisions and ROM-chip identifiers.
+
+## Nuked-MT32 ROM files
+
+Nuked-MT32 uses one shared MT-32 PCM ROM and one selected Control ROM.
+
+### Shared PCM ROM
+
+```text
+pcm_mt32.rom
+```
+
+Expected size:
+
+```text
+524288 bytes
+```
+
+### Supported Control ROM versions
+
+```text
+mt32_1_04_control.rom
+mt32_1_05_control.rom
+mt32_1_06_control.rom
+mt32_1_07_control.rom
+mt32_2_04_control.rom
+mt32_2_06_control.rom
+mt32_2_07_control.rom
+```
+
+Expected sizes:
+
+```text
+MT-32 1.xx Control ROM:  65536 bytes
+MT-32 2.xx Control ROM: 131072 bytes
+```
+
+The scanner validates ROM identity from the recognized ROM content. The filenames above are the recommended convention for organization, but a correctly named file with invalid content will not be accepted as the requested version.
+
+Munt may also use CM-32L, CM-64, or LAPC-I compatible ROM sets. This is one reason Munt remains available alongside Nuked-MT32.
+
+## Configuration
+
+Edit `mt32-pi.cfg` on the SD card.
+
+### Munt
+
+The existing `[mt32emu]` section is reserved for Munt:
+
+```ini
+[mt32emu]
+gain = 1.0
+reverb_gain = 1.0
+resampler_quality = good
+midi_channels = standard
+rom_set = old
+reversed_stereo = off
+```
+
+Common `rom_set` values for Munt are:
+
+```text
+old
+new
+cm32l
+```
+
+Munt and Nuked-MT32 use independent ROM selections. For example, Munt can use `cm32l` while Nuked-MT32 uses firmware `1.04`.
+
+### Nuked-MT32
+
+```ini
+[nuked_mt32]
+midi_channels = standard
+rom_set = 1.04
+reversed_stereo = off
+```
+
+Valid exact firmware selections are:
+
+```text
+1.04
+1.05
+1.06
+1.07
+2.04
+2.06
+2.07
+```
+
+MIDI channel modes:
+
+```text
+standard   Parts 1 through 8 use MIDI channels 2 through 9; Rhythm uses channel 10
+alternate  Parts 1 through 8 use MIDI channels 1 through 8; Rhythm uses channel 10
+```
+
+Stereo modes:
+
+```text
+reversed_stereo = off  Keep the native MT-32 output orientation
+reversed_stereo = on   Swap the final left and right output channels
+```
+
+When selected, the display reports the actual recognized Control ROM, for example:
+
+```text
+Nuked-MT32 1.04
+Nuked-MT32 2.07
+```
+
+### Nuked-SC55
+
+```ini
+[sc55]
+model = mk2
+debug = off
+```
+
+Supported model values in this integration:
+
+```text
+mk1
+mk2
+```
+
+When `debug = on`, the display can show runtime counters used for diagnosing the audio producer and ring buffer:
+
+```text
+R  Ring-buffer occupancy
+U  Underrun count
+P  Samples produced per second
+C  Samples consumed per second
+```
+
+The firmware no longer creates `sc55.log` automatically on the SD card.
+
+### FluidSynth
+
+FluidSynth remains configured through the normal `[fluidsynth]` section. At least one legally distributable or user-supplied SoundFont must be available in the `soundfonts` directory.
+
+Example:
+
+```ini
+[fluidsynth]
+soundfont = 0
+polyphony = 200
+gain = 0.2
+reverb = on
+chorus = on
+```
+
+## Selecting modules
+
+The configured physical button can cycle through all available modules:
+
+```text
+Munt
+FluidSynth
+Nuked-SC55
+Nuked-MT32
+```
+
+The modules can also be selected using mt32-pi custom SysEx messages.
+
+```text
+F0 7D 03 00 F7 = Switch to Munt
+F0 7D 03 01 F7 = Switch to FluidSynth
+F0 7D 03 02 F7 = Switch to Nuked-SC55
+F0 7D 03 03 F7 = Switch to Nuked-MT32
+```
+
+Additional custom SysEx commands:
+
+```text
+F0 7D 01 00 F7 = Select the Munt MT-32 Old ROM set
+F0 7D 01 01 F7 = Select the Munt MT-32 New ROM set
+F0 7D 01 02 F7 = Select the Munt CM-32L ROM set
+
+F0 7D 04 00 F7 = Disable reversed stereo
+F0 7D 04 01 F7 = Enable reversed stereo
+
+F0 7D 02 XX F7 = Select SoundFont index XX
+
+F0 7D 00 F7 = Reboot mt32-pi
+```
+
+Exact Nuked-MT32 firmware versions are selected in `mt32-pi.cfg`, not with the Munt ROM-set SysEx command.
+
+## Building for Raspberry Pi 4
+
+Clone the repository and initialize all submodules:
+
+```bash
+git clone --recursive https://github.com/odiaboeeu/mt32-pi-nuked.git
+cd mt32-pi
+git submodule update --init --recursive
+```
+
+Build the 64-bit Raspberry Pi 4 image:
+
+```bash
+make clean
+make BOARD=pi4-64
+```
+
+The resulting image is:
+
+```text
+kernel8-rpi4.img
+```
+
+Copy it to the SD card using the filename expected by the card configuration, commonly:
+
+```text
+kernel8.img
+```
+
+Build requirements and toolchain setup remain based on the original mt32-pi and Circle documentation.
+
+## Dependency updates
+
+This development branch includes integration work for newer project revisions than the original mt32-pi release line:
+
+- Circle Step 51
+- FluidSynth 2.6.1
+- Munt 2.8.3
+
+Circle provides the Raspberry Pi bare-metal runtime, drivers, multicore support, filesystems, USB, audio, and other platform services. FluidSynth provides SoundFont synthesis. Munt provides the established MT-32 family emulation backend and also supplies the reverb implementation used as a substitute by this Nuked-MT32 port.
+
+Because these components are included as submodules or imported components, the exact commit recorded by the checked-out branch is authoritative for a reproducible build:
+
+```bash
+git submodule status
+```
+
+## Known limitations
+
+- Raspberry Pi 4 is the supported and validated target for the complete integration.
+- Raspberry Pi 3 does not have enough processing performance for reliable Nuked-SC55 operation in this port.
+- Raspberry Pi 5 has not been validated by this project.
+- Nuked-MT32 remains incomplete because the original MT-32 reverb chip has not been decapped and is not emulated by the upstream project.
+- Nuked-MT32 uses a Munt-derived reverb implementation as a substitute.
+- Nuked-SC55 and Nuked-MT32 require user-supplied ROMs that must be legally obtained.
+- Low-level emulation is sensitive to CPU load, power quality, cooling, and audio-buffer timing.
+- A MiSTer user-port HAT that was sufficient for a Raspberry Pi 3 may not provide a reliable power path for a Raspberry Pi 4.
+
+## Troubleshooting
+
+### Nuked-SC55 slows down or audio breaks up
+
+- Use a Raspberry Pi 4.
+- Test with a dedicated, known-good Raspberry Pi 4 power supply.
+- Check for undervoltage and thermal-throttling warnings.
+- Enable `[sc55] debug = on` and monitor `R`, `U`, `P`, and `C`.
+- Confirm that the correct MkI or MkII ROM set is installed.
+
+### Nuked-MT32 does not start
+
+- Confirm that `pcm_mt32.rom` is present.
+- Confirm that the exact Control ROM selected by `rom_set` is present.
+- Verify that the selected value is one of the seven supported versions.
+- Do not expect a missing version to fall back silently to another revision.
+
+### The selected Nuked-MT32 version is incorrect
+
+Check the configuration section name:
+
+```ini
+[nuked_mt32]
+rom_set = 1.04
+```
+
+The `[mt32emu]` section controls Munt. The `[nuked_mt32]` section controls Nuked-MT32.
+
+### `sc55.log` is not created
+
+This is intentional. Automatic SC-55 log-file creation was disabled to avoid unnecessary persistent writes to the SD card. The visual debug counters remain available.
+
+## Legal and ROM notice
+
+This repository does not distribute Roland firmware, Control ROMs, PCM ROMs, wave ROMs, or other copyrighted firmware data. Users must provide legally obtained ROM images.
+
+This project is intended to comply with the licenses of the projects it incorporates or derives from. Review the license files in this repository and in every submodule before redistributing source code, modified source code, binaries, firmware images, SD-card images, or hardware bundles.
+
+At the time this README was prepared:
+
+- mt32-pi is distributed under GPL-3.0.
+- Nuked-SC55 is distributed under GPL-2.0-or-later.
+- Nuked-MT32 is distributed under GPL-2.0.
+- Munt uses LGPL-2.1 for the mt32emu library.
+- Other dependencies retain their own licenses.
+
+This README is informational and is not legal advice. The license texts included with the source code are authoritative.
+
+## Credits and acknowledgments
+
+This project exists because of the work of many developers and contributors.
+
+Special thanks to:
+
+- [Dale Whinham](https://github.com/dwhinham), creator of mt32-pi, and everyone who contributed to the original project. mt32-pi provides the architecture, bare-metal integration, user interface, configuration system, MIDI support, display support, MiSTer integration, and the foundation on which this work is built.
+- [nukeykt](https://github.com/nukeykt), creator of Nuked-SC55 and Nuked-MT32, for the extensive reverse-engineering work and for releasing both emulator codebases.
+- [J.C. Moyer](https://github.com/jcmoyer), whose Nuked-SC55 fork and optimization work made the Raspberry Pi 4 SC-55 integration practical.
+- [Keith Adler](https://github.com/keithadler), whose Nuked-MT32 development line provided the Munt-based reverb approach used by this port.
+- The [Munt project](https://github.com/munt/munt) contributors for MT-32 family emulation and the reverb implementation used by this Nuked-MT32 integration.
+- The [FluidSynth project](https://github.com/FluidSynth/fluidsynth) contributors for the SoundFont synthesizer used by mt32-pi.
+- The [Circle project](https://github.com/rsta2/circle) and circle-stdlib contributors for the Raspberry Pi bare-metal environment.
+- Everyone who tested firmware images, reported regressions, documented hardware behavior, and compared emulation with original sound modules.
+
+Please also consult the acknowledgment and license sections of every upstream repository. This fork does not claim ownership of the upstream emulator designs or reverse-engineering work.
+
+## Upstream projects
+
+- [Original mt32-pi project](https://github.com/dwhinham/mt32-pi)
+- [Original Nuked-SC55 project](https://github.com/nukeykt/Nuked-SC55)
+- [J.C. Moyer Nuked-SC55 fork](https://github.com/jcmoyer/Nuked-SC55)
+- [Original Nuked-MT32 project](https://github.com/nukeykt/Nuked-MT32)
+- [Keith Adler GitHub account](https://github.com/keithadler)
+- [Munt](https://github.com/munt/munt)
+- [FluidSynth](https://github.com/FluidSynth/fluidsynth)
+- [Circle](https://github.com/rsta2/circle)
