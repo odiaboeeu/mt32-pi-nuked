@@ -80,33 +80,38 @@ A typical card layout is:
 
 ```text
 /
-├── kernel8.img
-├── mt32-pi.cfg
-├── roms/
-│   ├── pcm_mt32.rom
-│   ├── mt32_1_04_control.rom
-│   ├── mt32_1_05_control.rom
-│   ├── mt32_1_06_control.rom
-│   ├── mt32_1_07_control.rom
-│   ├── mt32_2_04_control.rom
-│   ├── mt32_2_06_control.rom
-│   ├── mt32_2_07_control.rom
-│   ├── ctrl_cm32l_1_00.rom
-│   ├── ctrl_cm32l_1_02.rom
-│   ├── pcm_cm32l.rom
-│   └── sc55/
-│       ├── rom1.bin
-│       ├── rom2.bin
-│       ├── rom_sm.bin
-│       ├── waverom1.bin
-│       ├── waverom2.bin
-│       ├── sc55_rom1.bin
-│       ├── sc55_rom2.bin
-│       ├── sc55_waverom1.bin
-│       ├── sc55_waverom2.bin
-│       └── sc55_waverom3.bin
-└── soundfonts/
-    └── your-soundfont.sf2
+|-- config.txt
+|-- kernel8-rpi4.img
+|-- mt32-pi.cfg
+|-- firmware/
+|-- overlays/
+|-- roms/
+|   |-- pcm_mt32.rom
+|   |-- mt32_1_04_control.rom
+|   |-- mt32_1_05_control.rom
+|   |-- mt32_1_06_control.rom
+|   |-- mt32_1_07_control.rom
+|   |-- mt32_2_04_control.rom
+|   |-- mt32_2_06_control.rom
+|   |-- mt32_2_07_control.rom
+|   |-- ctrl_cm32l_1_00.rom
+|   |-- ctrl_cm32l_1_02.rom
+|   |-- pcm_cm32l.rom
+|   `-- sc55/
+|       |-- mk1/
+|       |   |-- rom1.bin
+|       |   |-- rom2.bin
+|       |   |-- waverom1.bin
+|       |   |-- waverom2.bin
+|       |   `-- waverom3.bin
+|       `-- mk2/
+|           |-- rom_sm.bin
+|           |-- rom1.bin
+|           |-- rom2.bin
+|           |-- waverom1.bin
+|           `-- waverom2.bin
+`-- soundfonts/
+    `-- your-soundfont.sf2
 ```
 
 Only install ROM images legally obtained from hardware you own or from another source that you are legally permitted to use. ROM images are not included with this project.
@@ -117,39 +122,56 @@ The integrated backend currently focuses on SC-55 MkI and SC-55 MkII operation.
 
 ### SC-55 MkII
 
-Place these files in the SC-55 ROM directory used by the build:
+Place the SC-55 MkII files in `roms/sc55/mk2/`.
 
 ```text
-rom1.bin
-rom2.bin
-rom_sm.bin
-waverom1.bin
-waverom2.bin
+roms/sc55/mk2/
+|-- rom_sm.bin
+|-- rom1.bin
+|-- rom2.bin
+|-- waverom1.bin
+`-- waverom2.bin
 ```
 
-The upstream Nuked-SC55 documentation associates these files with:
+Expected file sizes:
 
 ```text
-rom1.bin      H8/532 MCU firmware
-rom2.bin      H8/532 extra code
-rom_sm.bin    M37450M2 sub-MCU firmware
-waverom1.bin  16 Mbit wave ROM
-waverom2.bin  8 Mbit wave ROM
+rom_sm.bin      4 KiB
+rom1.bin       32 KiB
+rom2.bin      512 KiB
+waverom1.bin    2 MiB
+waverom2.bin    1 MiB
 ```
+
+Folder names and filenames must match exactly, including lowercase letters.
 
 ### SC-55 MkI
 
-Place these files in the SC-55 ROM directory:
+Place the SC-55 MkI files in `roms/sc55/mk1/`.
 
 ```text
-sc55_rom1.bin
-sc55_rom2.bin
-sc55_waverom1.bin
-sc55_waverom2.bin
-sc55_waverom3.bin
+roms/sc55/mk1/
+|-- rom1.bin
+|-- rom2.bin
+|-- waverom1.bin
+|-- waverom2.bin
+`-- waverom3.bin
 ```
 
-The specific MkI firmware revision depends on the ROM images supplied by the user. Refer to the upstream Nuked-SC55 documentation for known firmware revisions and ROM-chip identifiers.
+Expected file sizes:
+
+```text
+rom1.bin       32 KiB
+rom2.bin      256 KiB
+waverom1.bin    1 MiB
+waverom2.bin    1 MiB
+waverom3.bin    1 MiB
+```
+
+Do not place the MkI files directly in `roms/sc55/`.
+The files must be stored in the `mk1` subdirectory.
+
+The exact MkI firmware revision depends on the legally obtained ROM images supplied by the user.
 
 ## Nuked-MT32 ROM files
 
@@ -344,7 +366,7 @@ Clone the repository and initialize all submodules:
 
 ```bash
 git clone --recursive https://github.com/odiaboeeu/mt32-pi-nuked.git
-cd mt32-pi
+cd mt32-pi-nuked
 git submodule update --init --recursive
 ```
 
@@ -361,10 +383,18 @@ The resulting image is:
 kernel8-rpi4.img
 ```
 
-Copy it to the SD card using the filename expected by the card configuration, commonly:
+Copy the Raspberry Pi 4 image to the root of the SD card as:
 
 ```text
-kernel8.img
+kernel8-rpi4.img
+```
+
+The Raspberry Pi 4 section in `config.txt` must select it:
+
+```ini
+arm_64bit=1
+armstub=armstub8-rpi4.bin
+kernel=kernel8-rpi4.img
 ```
 
 Build requirements and toolchain setup remain based on the original mt32-pi and Circle documentation.
