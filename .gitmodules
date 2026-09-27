@@ -1,6 +1,6 @@
 [submodule "external/circle-stdlib"]
 	path = external/circle-stdlib
-	url = https://github.com/smuehlst/circle-stdlib
+	url = https://github.com/odiaboeeu/circle-stdlib.git
 	ignore = dirty
 [submodule "external/munt"]
 	path = external/munt
