@@ -17,6 +17,9 @@ extern "C" void SC88_LinkProbe()
     volatile auto playShortMessage =
         &sc88_headless_play_short_message;
 
+    volatile auto playSysEx =
+        &sc88_headless_play_sysex;
+
     volatile auto renderInt16 =
         &sc88_headless_render_int16;
 
@@ -34,6 +37,7 @@ extern "C" void SC88_LinkProbe()
     (void) isValid;
     (void) boot;
     (void) playShortMessage;
+    (void) playSysEx;
     (void) renderInt16;
     (void) sampleRate;
     (void) displayText;
