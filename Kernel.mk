@@ -33,6 +33,7 @@ OBJS		:=	src/config.o \
 			src/synth/nukedmt32synth.o \
 			src/synth/soundfontsynth.o \
 			src/synth/sc55synth.o  \
+                        src/synth/sc88linkprobe.o \
 			src/zoneallocator.o
 
 EXTRACLEAN	+=	src/*.d src/*.o \
@@ -119,8 +120,26 @@ CXXFLAGS        +=      -I"$(NEWLIBDIR)/include" \
                         -Iinclude \
                         -I.
 
+# Experimental Gearmulator SC-88 bare-metal core
+SC88HOME := $(CURDIR)/external/gearmulator-sc88
+SC88BUILDDIR := $(CURDIR)/build-gearmulator-sc88
+SC88LIB := $(SC88BUILDDIR)/libgearmulator_sc88_core.a
+INCLUDE += -I$(SC88HOME)/sc88-headless-core
+
+$(SC88LIB): build-gearmulator-sc88-core-pi4.sh
+	./build-gearmulator-sc88-core-pi4.sh
+
+EXTRALIBS += --whole-archive $(SC88LIB) --no-whole-archive
+
+# Force keeping the SC-88 link probe when --gc-sections is enabled
+LDFLAGS += -u SC88_LinkProbe
+
 # Experimental Nuked-SC55 headless core
 SC55LIB := $(CURDIR)/build-sc55/libnukedsc55_core.a
+
+$(SC55LIB): build-nuked-sc55-core-pi4-ofast-cycles24.sh
+	./build-nuked-sc55-core-pi4-ofast-cycles24.sh
+
 EXTRALIBS += --whole-archive $(SC55LIB) --no-whole-archive
 
 # Force keeping experimental SC-55 link probe when --gc-sections is enabled

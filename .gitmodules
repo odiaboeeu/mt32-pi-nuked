@@ -20,3 +20,7 @@
 [submodule "external/Nuked-MT32"]
 	path = external/Nuked-MT32
 	url = https://github.com/odiaboeeu/Nuked-MT32.git
+[submodule "external/gearmulator-sc88"]
+	path = external/gearmulator-sc88
+	url = https://github.com/odiaboeeu/gearmulator.git
+	branch = feature/sc88-baremetal
