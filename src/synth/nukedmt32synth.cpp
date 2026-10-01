@@ -293,7 +293,7 @@ void CNukedMT32Synth::AllSoundOff()
         for (u8 nChannel = 0; nChannel < 16; ++nChannel)
         {
             PostMIDIByte(0xB0 | nChannel);
-            PostMIDIByte(120);
+            PostMIDIByte(123);
             PostMIDIByte(0);
         }
 
