@@ -47,6 +47,7 @@ public:
 	virtual void HandleMIDISysExMessage(const u8* pData, size_t nSize) = 0;
 	virtual bool IsActive() = 0;
 	virtual void AllSoundOff() { m_MIDIMonitor.AllNotesOff(); };
+	virtual void HandleActiveSenseTimeout() { AllSoundOff(); };
 	virtual void SetMasterVolume(u8 nVolume) = 0;
 	virtual size_t Render(s16* pOutBuffer, size_t nFrames) = 0;
 	virtual size_t Render(float* pOutBuffer, size_t nFrames) = 0;

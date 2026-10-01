@@ -303,6 +303,31 @@ void CNukedMT32Synth::AllSoundOff()
     CSynthBase::AllSoundOff();
 }
 
+void CNukedMT32Synth::HandleActiveSenseTimeout()
+{
+    if (m_bInitialized)
+    {
+        m_Lock.Acquire();
+
+        for (u8 nChannel = 0; nChannel < 16; ++nChannel)
+        {
+            // Restore modulation, expression, hold and pitch bend.
+            PostMIDIByte(0xB0 | nChannel);
+            PostMIDIByte(121);
+            PostMIDIByte(0);
+
+            // Turn off all notes activated through MIDI.
+            PostMIDIByte(0xB0 | nChannel);
+            PostMIDIByte(123);
+            PostMIDIByte(0);
+        }
+
+        m_Lock.Release();
+    }
+
+    CSynthBase::AllSoundOff();
+}
+
 void CNukedMT32Synth::SetMIDIChannels(bool bAlternate)
 {
     const u8 nAddressHigh = 0x10;

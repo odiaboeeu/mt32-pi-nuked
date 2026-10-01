@@ -32,6 +32,7 @@ public:
     ) override;
     virtual bool IsActive() override;
     virtual void AllSoundOff() override;
+    virtual void HandleActiveSenseTimeout() override;
     virtual void SetMasterVolume(u8 nVolume) override;
     virtual size_t Render(s16* pOutBuffer, size_t nFrames) override;
     virtual size_t Render(float* pOutBuffer, size_t nFrames) override;

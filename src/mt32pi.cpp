@@ -561,7 +561,7 @@ void CMT32Pi::MainTask()
 		// Check for active sensing timeout
 		if (m_bActiveSenseFlag && (nTicks > m_nActiveSenseTime) && (nTicks - m_nActiveSenseTime) >= MSEC2HZ(ActiveSenseTimeoutMillis))
 		{
-			m_pCurrentSynth->AllSoundOff();
+			m_pCurrentSynth->HandleActiveSenseTimeout();
 			m_bActiveSenseFlag = false;
 			LOGNOTE("Active sense timeout - turning notes off");
 		}
