@@ -468,6 +468,7 @@ void CNukedMT32Synth::getOutputSamples(
 
         m_pReverb->process(
             &m_pMT32->samples[0][0],
+            &m_pMT32->reverb_input[0][0],
             static_cast<int>(nChunk)
         );
 
