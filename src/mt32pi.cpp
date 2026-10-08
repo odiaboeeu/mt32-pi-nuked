@@ -683,6 +683,17 @@ void CMT32Pi::UITask()
 	m_bUITaskDone = true;
 }
 
+// Saturate to s24 before integer conversion and packing.
+static s32 ConvertOutputSample24(float sample)
+{
+    const float scaled = sample * Sample24BitMax;
+    if (scaled > 8388607.0f)
+        return 8388607;
+    if (scaled < -8388608.0f)
+        return -8388608;
+    return static_cast<s32>(scaled);
+}
+
 void CMT32Pi::AudioTask()
 {
 	LOGNOTE("Audio task on Core 2 starting up");
@@ -699,7 +710,7 @@ void CMT32Pi::AudioTask()
 
 	// Extra byte so that we can write to the 24-bit buffer with overlapping 32-bit writes (efficiency)
 	float FloatBuffer[nQueueSizeFrames * nChannels];
-	s8 IntBuffer[nQueueSizeFrames * nBytesPerFrame + bI2S ? 0 : 1];
+	s8 IntBuffer[nQueueSizeFrames * nBytesPerFrame + (bI2S ? 0 : 1)];
 
 	while (m_bRunning)
 	{
@@ -715,8 +726,8 @@ void CMT32Pi::AudioTask()
 			{
 				s32* const pLeftSample = reinterpret_cast<s32*>(IntBuffer + i * nBytesPerSample);
 				s32* const pRightSample = reinterpret_cast<s32*>(IntBuffer + (i + 1) * nBytesPerSample);
-				*pLeftSample = FloatBuffer[i + 1] * Sample24BitMax;
-				*pRightSample = FloatBuffer[i] * Sample24BitMax;
+				*pLeftSample = ConvertOutputSample24(FloatBuffer[i + 1]);
+				*pRightSample = ConvertOutputSample24(FloatBuffer[i]);
 			}
 		}
 		else
@@ -725,7 +736,7 @@ void CMT32Pi::AudioTask()
 			for (size_t i = 0; i < nFrames * nChannels; ++i)
 			{
 				s32* const pSample = reinterpret_cast<s32*>(IntBuffer + i * nBytesPerSample);
-				*pSample = FloatBuffer[i] * Sample24BitMax;
+				*pSample = ConvertOutputSample24(FloatBuffer[i]);
 			}
 		}
 
