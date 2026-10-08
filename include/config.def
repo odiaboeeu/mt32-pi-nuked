@@ -82,6 +82,7 @@ BEGIN_SECTION(nuked_mt32)
 CFG(midi_channels,        TMT32EmuMIDIChannels,       NukedMT32MIDIChannels,       TMT32EmuMIDIChannels::Standard          )
 CFG(rom_set,              TNukedMT32ROMVersion,       NukedMT32ROMVersion,         TNukedMT32ROMVersion::V1_04              )
 CFG(reversed_stereo,      bool,                       NukedMT32ReversedStereo,      false                                    )
+CFG(dc_block, bool, NukedMT32DCBlock, false)
 END_SECTION
 
 BEGIN_SECTION(fluidsynth)

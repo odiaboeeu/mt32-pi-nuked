@@ -16,6 +16,7 @@ LOGMODULE("nukedmt32synth");
 
 CNukedMT32Synth::CNukedMT32Synth(unsigned int nSampleRate)
     : CSynthBase(nSampleRate),
+      m_bDCBlock(false),
       m_pMT32(nullptr),
       m_pReverb(nullptr),
       m_pResamplerModel(nullptr),
@@ -47,6 +48,7 @@ CNukedMT32Synth::~CNukedMT32Synth()
 
 void CNukedMT32Synth::ClearSynth()
 {
+    m_DcBlocker.reset();
     if (m_pResamplerModel)
     {
         SRCTools::ResamplerModel::freeResamplerModel(
@@ -171,6 +173,10 @@ bool CNukedMT32Synth::Initialize()
     }
 
     m_pReverb->init();
+
+    // Optional output DC removal; does not repair upstream clipping.
+    m_bDCBlock = CConfig::Get()->NukedMT32DCBlock;
+    m_DcBlocker.reset();
 
     const char* const pModel =
         m_pMT32->old_machine ? "MT-32 old" : "MT-32 new";
@@ -471,6 +477,9 @@ void CNukedMT32Synth::getOutputSamples(
             &m_pMT32->reverb_input[0][0],
             static_cast<int>(nChunk)
         );
+
+        if (m_bDCBlock)
+            m_DcBlocker.process(&m_pMT32->samples[0][0], static_cast<int>(nChunk));
 
         for (unsigned int i = 0; i < nChunk; ++i)
         {

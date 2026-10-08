@@ -8,6 +8,7 @@
 #include <circle/types.h>
 
 #include "FloatSampleProvider.h"
+#include "dcblock.h"
 #include "rommanager.h"
 #include "synth/mt32romset.h"
 #include "synth/nukedmt32romversion.h"
@@ -76,6 +77,8 @@ private:
 
     void ClearSynth();
 
+    DcBlocker m_DcBlocker;
+    bool m_bDCBlock;
     mt32_t* m_pMT32;
     Mt32Reverb* m_pReverb;
     SRCTools::FloatSampleProvider* m_pResamplerModel;
