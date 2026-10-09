@@ -163,7 +163,7 @@ bool CNukedMT32Synth::Initialize()
     m_pMT32->old_machine =
         m_CurrentROMSet == TMT32ROMSet::MT32Old;
 
-    m_pReverb = new Mt32Reverb();
+    m_pReverb = new Mt32Reverb(m_pMT32->old_machine);
 
     if (!m_pReverb)
     {
