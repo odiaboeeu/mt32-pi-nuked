@@ -69,25 +69,45 @@ extern "C"
 
 	// Replacements for fluid_sfont.c functions
 	// These were found to be much faster than FluidSynth's default approach of going through libc
+	constexpr unsigned SoundFontClusterMapEntries = 256;
+
+	struct TSoundFontFile
+	{
+		FIL File;
+		DWORD ClusterMap[SoundFontClusterMapEntries];
+	};
+
 	void* default_fopen(const char* path)
 	{
-		FIL* pFile = new FIL;
-		if (f_open(pFile, path, FA_READ) != FR_OK)
+		TSoundFontFile* pHandle = new TSoundFontFile;
+
+		if (f_open(&pHandle->File, path, FA_READ) != FR_OK)
 		{
-			delete pFile;
-			pFile = nullptr;
+			delete pHandle;
+			return nullptr;
 		}
 
-		return pFile;
+		pHandle->ClusterMap[0] = SoundFontClusterMapEntries;
+		pHandle->File.cltbl = pHandle->ClusterMap;
+
+		if (f_lseek(&pHandle->File, CREATE_LINKMAP) != FR_OK)
+		{
+			// Fall back to the normal seek path if the file is too
+			// fragmented or the cluster map cannot be created.
+			pHandle->File.cltbl = nullptr;
+		}
+
+		return pHandle;
 	}
 
 	int default_fclose(void* handle)
 	{
-		FIL* pFile = static_cast<FIL*>(handle);
+		TSoundFontFile* pHandle =
+			static_cast<TSoundFontFile*>(handle);
 
-		if (f_close(pFile) == FR_OK)
+		if (f_close(&pHandle->File) == FR_OK)
 		{
-			delete pFile;
+			delete pHandle;
 			return FLUID_OK;
 		}
 
@@ -96,36 +116,49 @@ extern "C"
 
 	fluid_long_long_t default_ftell(void* handle)
 	{
-		FIL* pFile = static_cast<FIL*>(handle);
-		return f_tell(pFile);
+		TSoundFontFile* pHandle =
+			static_cast<TSoundFontFile*>(handle);
+
+		return f_tell(&pHandle->File);
 	}
 
 	int safe_fread(void* buf, fluid_long_long_t count, void* fd)
 	{
-		FIL* pFile = static_cast<FIL*>(fd);
-		UINT nRead;
-		return f_read(pFile, buf, count, &nRead) == FR_OK ? FLUID_OK : FLUID_FAILED;
+		TSoundFontFile* pHandle =
+			static_cast<TSoundFontFile*>(fd);
+
+		UINT nRead = 0;
+		const FRESULT Result =
+			f_read(&pHandle->File, buf, count, &nRead);
+
+		return Result == FR_OK
+			&& nRead == static_cast<UINT>(count)
+			? FLUID_OK
+			: FLUID_FAILED;
 	}
 
 	int safe_fseek(void* fd, fluid_long_long_t ofs, int whence)
 	{
-		FIL* pFile = static_cast<FIL*>(fd);
+		TSoundFontFile* pHandle =
+			static_cast<TSoundFontFile*>(fd);
 
 		switch (whence)
 		{
 		case SEEK_CUR:
-			ofs += f_tell(pFile);
+			ofs += f_tell(&pHandle->File);
 			break;
 
 		case SEEK_END:
-			ofs += f_size(pFile);
+			ofs += f_size(&pHandle->File);
 			break;
 
 		default:
 			break;
 		}
 
-		return f_lseek(pFile, ofs) == FR_OK ? FLUID_OK : FLUID_FAILED;
+		return f_lseek(&pHandle->File, ofs) == FR_OK
+			? FLUID_OK
+			: FLUID_FAILED;
 	}
 }
 
