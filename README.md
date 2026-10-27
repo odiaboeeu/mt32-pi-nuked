@@ -247,6 +247,7 @@ Munt and Nuked-MT32 use independent ROM selections. For example, Munt can use `c
 midi_channels = standard
 rom_set = 1.04
 reversed_stereo = off
+reverb = on
 ```
 
 Valid exact firmware selections are:
@@ -273,6 +274,12 @@ Stereo modes:
 ```text
 reversed_stereo = off  Keep the native MT-32 output orientation
 reversed_stereo = on   Swap the final left and right output channels
+```
+
+Reverb modes:
+```text
+reverb = on   Enable Nuked-MT32 reverb processing
+reverb = off  Disable Nuked-MT32 reverb processing
 ```
 
 When selected, the display reports the actual recognized Control ROM, for example:

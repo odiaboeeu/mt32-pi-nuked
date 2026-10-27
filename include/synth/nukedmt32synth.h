@@ -79,6 +79,7 @@ private:
 
     DcBlocker m_DcBlocker;
     bool m_bDCBlock;
+    bool m_bReverbEnabled;
     mt32_t* m_pMT32;
     Mt32Reverb* m_pReverb;
     SRCTools::FloatSampleProvider* m_pResamplerModel;

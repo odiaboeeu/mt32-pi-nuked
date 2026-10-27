@@ -17,6 +17,7 @@ LOGMODULE("nukedmt32synth");
 CNukedMT32Synth::CNukedMT32Synth(unsigned int nSampleRate)
     : CSynthBase(nSampleRate),
       m_bDCBlock(false),
+      m_bReverbEnabled(true),
       m_pMT32(nullptr),
       m_pReverb(nullptr),
       m_pResamplerModel(nullptr),
@@ -176,6 +177,7 @@ bool CNukedMT32Synth::Initialize()
 
     // Optional output DC removal; does not repair upstream clipping.
     m_bDCBlock = CConfig::Get()->NukedMT32DCBlock;
+    m_bReverbEnabled = CConfig::Get()->NukedMT32Reverb;
     m_DcBlocker.reset();
 
     const char* const pModel =
@@ -472,11 +474,14 @@ void CNukedMT32Synth::getOutputSamples(
 
         m_pMT32->clock(nChunk);
 
-        m_pReverb->process(
-            &m_pMT32->samples[0][0],
-            &m_pMT32->reverb_input[0][0],
-            static_cast<int>(nChunk)
-        );
+        if (m_bReverbEnabled)
+        {
+            m_pReverb->process(
+                &m_pMT32->samples[0][0],
+                &m_pMT32->reverb_input[0][0],
+                static_cast<int>(nChunk)
+            );
+        }
 
         if (m_bDCBlock)
             m_DcBlocker.process(&m_pMT32->samples[0][0], static_cast<int>(nChunk));
