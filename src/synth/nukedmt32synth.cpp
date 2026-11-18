@@ -9,17 +9,15 @@
 #include "config.h"
 #include "mt32.h"
 #include "ResamplerModel.h"
-#include "reverb.h"
 #include "synth/nukedmt32synth.h"
+#include <fatfs/ff.h>
 
 LOGMODULE("nukedmt32synth");
 
 CNukedMT32Synth::CNukedMT32Synth(unsigned int nSampleRate)
     : CSynthBase(nSampleRate),
       m_bDCBlock(false),
-      m_bReverbEnabled(true),
       m_pMT32(nullptr),
-      m_pReverb(nullptr),
       m_pResamplerModel(nullptr),
       m_CurrentROMSet(TMT32ROMSet::Any),
       m_pControlROMImage(nullptr),
@@ -59,9 +57,6 @@ void CNukedMT32Synth::ClearSynth()
 
         m_pResamplerModel = nullptr;
     }
-
-    delete m_pReverb;
-    m_pReverb = nullptr;
 
     delete m_pMT32;
     m_pMT32 = nullptr;
@@ -161,23 +156,77 @@ bool CNukedMT32Synth::Initialize()
         nPCMSize
     );
 
+    {
+        const bool bOldMachine =
+            m_CurrentROMSet == TMT32ROMSet::MT32Old;
+
+        const char* const pReverbROMPath = bOldMachine
+            ? "SD:/roms/mt32_reverb_old.bin"
+            : "SD:/roms/mt32_reverb_new.bin";
+
+        const char* const pReverbROMRootPath = bOldMachine
+            ? "SD:/mt32_reverb_old.bin"
+            : "SD:/mt32_reverb_new.bin";
+
+        FIL ReverbROM;
+        FRESULT Result = f_open(
+            &ReverbROM,
+            pReverbROMPath,
+            FA_READ
+        );
+
+        if (Result != FR_OK)
+        {
+            Result = f_open(
+                &ReverbROM,
+                pReverbROMRootPath,
+                FA_READ
+            );
+        }
+
+        if (Result != FR_OK)
+        {
+            LOGERR(
+                "MT-32 %s Reverb ROM unavailable",
+                bOldMachine ? "OLD" : "NEW"
+            );
+            ClearSynth();
+            return false;
+        }
+
+        if (f_size(&ReverbROM) != sizeof(m_pMT32->rvrom))
+        {
+            LOGERR("Unexpected Reverb ROM size: %u",
+                   static_cast<unsigned int>(f_size(&ReverbROM)));
+            f_close(&ReverbROM);
+            ClearSynth();
+            return false;
+        }
+
+        UINT BytesRead = 0;
+        Result = f_read(
+            &ReverbROM,
+            m_pMT32->rvrom,
+            sizeof(m_pMT32->rvrom),
+            &BytesRead
+        );
+
+        f_close(&ReverbROM);
+
+        if (Result != FR_OK ||
+            BytesRead != sizeof(m_pMT32->rvrom))
+        {
+            LOGERR("Failed to read MT-32 Reverb ROM");
+            ClearSynth();
+            return false;
+        }
+    }
+
     m_pMT32->old_machine =
         m_CurrentROMSet == TMT32ROMSet::MT32Old;
 
-    m_pReverb = new Mt32Reverb(m_pMT32->old_machine);
-
-    if (!m_pReverb)
-    {
-        LOGERR("Failed to allocate Nuked-MT32 reverb");
-        ClearSynth();
-        return false;
-    }
-
-    m_pReverb->init();
-
     // Optional output DC removal; does not repair upstream clipping.
     m_bDCBlock = CConfig::Get()->NukedMT32DCBlock;
-    m_bReverbEnabled = CConfig::Get()->NukedMT32Reverb;
     m_DcBlocker.reset();
 
     const char* const pModel =
@@ -249,7 +298,6 @@ void CNukedMT32Synth::PostMIDIByte(u8 nByte)
         return;
 
     m_pMT32->post_midi(nByte);
-    m_pReverb->observeMidiByte(nByte);
 }
 
 void CNukedMT32Synth::HandleMIDIShortMessage(u32 nMessage)
@@ -473,15 +521,6 @@ void CNukedMT32Synth::getOutputSamples(
             nChunk = NativeBufferFrames;
 
         m_pMT32->clock(nChunk);
-
-        if (m_bReverbEnabled)
-        {
-            m_pReverb->process(
-                &m_pMT32->samples[0][0],
-                &m_pMT32->reverb_input[0][0],
-                static_cast<int>(nChunk)
-            );
-        }
 
         if (m_bDCBlock)
             m_DcBlocker.process(&m_pMT32->samples[0][0], static_cast<int>(nChunk));
