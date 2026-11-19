@@ -193,6 +193,14 @@ CSC55Synth::CSC55Synth(
           ),
           m_bDebug(bDebug),
           m_nVolume(100),
+          m_MkIHighPassPrevInL(0.0f),
+          m_MkIHighPassPrevOutL(0.0f),
+          m_MkILowPassL1(0.0f),
+          m_MkILowPassL2(0.0f),
+          m_MkIHighPassPrevInR(0.0f),
+          m_MkIHighPassPrevOutR(0.0f),
+          m_MkILowPassR1(0.0f),
+          m_MkILowPassR2(0.0f),
           m_MkIIAnalogL1(0.0f),
           m_MkIIAnalogL2(0.0f),
           m_MkIIAnalogL3(0.0f),
@@ -562,6 +570,54 @@ void CSC55Synth::SetMasterVolume(u8 nVolume)
 
 
 
+void CSC55Synth::ProcessMkIAnalogFilter(short& Left, short& Right)
+{
+        if (m_Model != TSC55Model::MK1)
+                return;
+
+        // SC-55 MkI service-note path, evaluated at the native 64,000 Hz rate:
+        // C44/C45 with R41/R42: 10 uF / 12 kohm -> about 1.326 Hz high-pass
+        // R51/R52 with C37/C38: 22 kohm / 100 pF -> about 72.34 kHz low-pass
+        // R57/R58 with C39/C40: 18 kohm / 82 pF  -> about 107.8 kHz low-pass
+        //
+        // R90/R91 replace the unused IC13A/B stage on the documented board
+        // revision. The 680 ohm / 100 pF RF network is outside the audio band
+        // at this sample rate and is intentionally omitted in this candidate.
+        // Analog gain and output-stage clipping remain normalized/unchanged.
+        constexpr float HighPassA = 0.9998698f;
+        constexpr float LowPassA1 = 0.9991740f;
+        constexpr float LowPassA2 = 0.9999748f;
+
+        const float InL = static_cast<float>(Left);
+        const float InR = static_cast<float>(Right);
+
+        const float HighL = HighPassA *
+                (m_MkIHighPassPrevOutL + InL - m_MkIHighPassPrevInL);
+        m_MkIHighPassPrevInL = InL;
+        m_MkIHighPassPrevOutL = HighL;
+        m_MkILowPassL1 += LowPassA1 * (HighL - m_MkILowPassL1);
+        m_MkILowPassL2 += LowPassA2 * (m_MkILowPassL1 - m_MkILowPassL2);
+
+        const float HighR = HighPassA *
+                (m_MkIHighPassPrevOutR + InR - m_MkIHighPassPrevInR);
+        m_MkIHighPassPrevInR = InR;
+        m_MkIHighPassPrevOutR = HighR;
+        m_MkILowPassR1 += LowPassA1 * (HighR - m_MkILowPassR1);
+        m_MkILowPassR2 += LowPassA2 * (m_MkILowPassR1 - m_MkILowPassR2);
+
+        float OutL = m_MkILowPassL2;
+        float OutR = m_MkILowPassR2;
+
+        if (OutL > 32767.0f) OutL = 32767.0f;
+        if (OutL < -32768.0f) OutL = -32768.0f;
+        if (OutR > 32767.0f) OutR = 32767.0f;
+        if (OutR < -32768.0f) OutR = -32768.0f;
+
+        Left = static_cast<short>(OutL);
+        Right = static_cast<short>(OutR);
+}
+
+
 void CSC55Synth::ProcessMkIIAnalogFilter(short& Left, short& Right)
 {
         if (m_Model != TSC55Model::MK2)
@@ -649,6 +705,7 @@ void CSC55Synth::Pump(size_t nMaxSteps)
                         while (nBatchCount < SampleBatchFrames &&
                                SC55_HeadlessPopSample(&left, &right))
                         {
+                                ProcessMkIAnalogFilter(left, right);
                                 ProcessMkIIAnalogFilter(left, right);
                                 BatchLeft[nBatchCount] = left;
                                 BatchRight[nBatchCount] = right;

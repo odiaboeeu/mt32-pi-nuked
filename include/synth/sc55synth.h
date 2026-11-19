@@ -38,6 +38,7 @@ public:
 private:
         bool LoadROMFile(const char* pPath, u8*& pOutData, unsigned int& nOutSize);
         void FreeROMBuffer(u8*& pData);
+        void ProcessMkIAnalogFilter(short& Left, short& Right);
         void ProcessMkIIAnalogFilter(short& Left, short& Right);
 
         CSC55ProducerTask* m_pProducerTask;
@@ -48,6 +49,16 @@ private:
         unsigned m_nNativeSampleRate;
         bool m_bDebug;
         u8 m_nVolume;
+
+        // SC-55 MkI DAC-to-point-B analog reconstruction state.
+        float m_MkIHighPassPrevInL;
+        float m_MkIHighPassPrevOutL;
+        float m_MkILowPassL1;
+        float m_MkILowPassL2;
+        float m_MkIHighPassPrevInR;
+        float m_MkIHighPassPrevOutR;
+        float m_MkILowPassR1;
+        float m_MkILowPassR2;
 
         // SC-55mkII DAC-to-point-B analog reconstruction state.
         // Three measured RC poles from the Roland output network are
