@@ -36,9 +36,8 @@ COMMON_FLAGS=(
 SOURCES=(
     mt32.cpp
     la32.cpp
+    rv2.cpp
     lcd.cpp
-    # BReverbModel.cpp is already provided by the mt32emu library.
-    reverb.cpp
     mame/mcs96.cpp
     mame/i8x9x.cpp
 )
