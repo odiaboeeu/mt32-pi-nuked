@@ -38,6 +38,7 @@ public:
 private:
         bool LoadROMFile(const char* pPath, u8*& pOutData, unsigned int& nOutSize);
         void FreeROMBuffer(u8*& pData);
+        void ProcessMkIIAnalogFilter(short& Left, short& Right);
 
         CSC55ProducerTask* m_pProducerTask;
         volatile bool m_bProducerRunning;
@@ -47,6 +48,16 @@ private:
         unsigned m_nNativeSampleRate;
         bool m_bDebug;
         u8 m_nVolume;
+
+        // SC-55mkII DAC-to-point-B analog reconstruction state.
+        // Three measured RC poles from the Roland output network are
+        // evaluated at the native 66,207 Hz rate.
+        float m_MkIIAnalogL1;
+        float m_MkIIAnalogL2;
+        float m_MkIIAnalogL3;
+        float m_MkIIAnalogR1;
+        float m_MkIIAnalogR2;
+        float m_MkIIAnalogR3;
 };
 
 #endif

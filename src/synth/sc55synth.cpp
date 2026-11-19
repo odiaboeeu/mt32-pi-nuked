@@ -192,7 +192,13 @@ CSC55Synth::CSC55Synth(
               Model == TSC55Model::MK1 ? 64000 : 66207
           ),
           m_bDebug(bDebug),
-          m_nVolume(100)
+          m_nVolume(100),
+          m_MkIIAnalogL1(0.0f),
+          m_MkIIAnalogL2(0.0f),
+          m_MkIIAnalogL3(0.0f),
+          m_MkIIAnalogR1(0.0f),
+          m_MkIIAnalogR2(0.0f),
+          m_MkIIAnalogR3(0.0f)
 {
 }
 
@@ -556,6 +562,47 @@ void CSC55Synth::SetMasterVolume(u8 nVolume)
 
 
 
+void CSC55Synth::ProcessMkIIAnalogFilter(short& Left, short& Right)
+{
+        if (m_Model != TSC55Model::MK2)
+                return;
+
+        // SC-55mkII service-note values, evaluated at 66,207 Hz:
+        // R27/C46: 22 kohm / 100 pF  -> about 72.34 kHz
+        // R47/C56: 12 kohm / 680 pF  -> about 19.50 kHz
+        // R45/C54: 12 kohm / 120 pF  -> about 110.52 kHz
+        //
+        // This first candidate keeps unity DC gain. It deliberately does not
+        // model the documented 1.833 analog gain, output-stage clipping, the
+        // coupling high-pass, or the mt32-pi sample-rate converter.
+        constexpr float A1 = 0.99895823f;
+        constexpr float A2 = 0.84287876f;
+        constexpr float A3 = 0.99997223f;
+
+        const float InL = static_cast<float>(Left);
+        const float InR = static_cast<float>(Right);
+
+        m_MkIIAnalogL1 += A1 * (InL - m_MkIIAnalogL1);
+        m_MkIIAnalogL2 += A2 * (m_MkIIAnalogL1 - m_MkIIAnalogL2);
+        m_MkIIAnalogL3 += A3 * (m_MkIIAnalogL2 - m_MkIIAnalogL3);
+
+        m_MkIIAnalogR1 += A1 * (InR - m_MkIIAnalogR1);
+        m_MkIIAnalogR2 += A2 * (m_MkIIAnalogR1 - m_MkIIAnalogR2);
+        m_MkIIAnalogR3 += A3 * (m_MkIIAnalogR2 - m_MkIIAnalogR3);
+
+        float OutL = m_MkIIAnalogL3;
+        float OutR = m_MkIIAnalogR3;
+
+        if (OutL > 32767.0f) OutL = 32767.0f;
+        if (OutL < -32768.0f) OutL = -32768.0f;
+        if (OutR > 32767.0f) OutR = 32767.0f;
+        if (OutR < -32768.0f) OutR = -32768.0f;
+
+        Left = static_cast<short>(OutL);
+        Right = static_cast<short>(OutR);
+}
+
+
 void CSC55Synth::StopProducer()
 {
         m_bProducerRunning = false;
@@ -602,6 +649,7 @@ void CSC55Synth::Pump(size_t nMaxSteps)
                         while (nBatchCount < SampleBatchFrames &&
                                SC55_HeadlessPopSample(&left, &right))
                         {
+                                ProcessMkIIAnalogFilter(left, right);
                                 BatchLeft[nBatchCount] = left;
                                 BatchRight[nBatchCount] = right;
                                 ++nBatchCount;
