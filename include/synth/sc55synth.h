@@ -9,12 +9,15 @@
 
 #include <circle/types.h>
 
+#include "FloatSampleProvider.h"
 #include "synth/sc55model.h"
 #include "synth/synthbase.h"
 
 class CSC55ProducerTask;
 
-class CSC55Synth : public CSynthBase
+class CSC55Synth
+    : public CSynthBase,
+      private SRCTools::FloatSampleProvider
 {
 public:
         explicit CSC55Synth(unsigned nSampleRate, TSC55Model Model, bool bDebug);
@@ -36,13 +39,18 @@ public:
         virtual void UpdateLCD(CLCD& LCD, unsigned int nTicks) override;
 
 private:
+        static constexpr size_t ConversionBufferFrames = 256;
+
         bool LoadROMFile(const char* pPath, u8*& pOutData, unsigned int& nOutSize);
         void FreeROMBuffer(u8*& pData);
+        virtual void getOutputSamples(float* pOutBuffer, unsigned int nFrames) override;
         void ProcessMkIAnalogFilter(short& Left, short& Right);
         void ProcessMkIIAnalogFilter(short& Left, short& Right);
 
         CSC55ProducerTask* m_pProducerTask;
         volatile bool m_bProducerRunning;
+        SRCTools::FloatSampleProvider* m_pResamplerModel;
+        bool m_bOutputEnabled;
 
         bool m_bInitialized;
         TSC55Model m_Model;

@@ -12,6 +12,7 @@
 #include <circle/sched/task.h>
 #include <circle/sched/scheduler.h>
 
+#include "ResamplerModel.h"
 #include "lcd/lcd.h"
 #include "lcd/ui.h"
 #include "synth/sc55synth.h"
@@ -74,9 +75,6 @@ namespace
                 return nWrite - nRead;
         }
 
-        unsigned g_SC55ResampleAccumulator = 0;
-        short g_SC55LastLeft = 0;
-        short g_SC55LastRight = 0;
         size_t g_SC55Underruns = 0;
         size_t g_SC55ProducedSamples = 0;
         size_t g_SC55ConsumedSamples = 0;
@@ -123,10 +121,7 @@ namespace
         {
                 g_SC55RingRead = 0;
                 g_SC55RingWrite = 0;
-                g_SC55ResampleAccumulator = 0;
-                g_SC55LastLeft = 0;
-                g_SC55LastRight = 0;
-                        g_SC55Underruns = 0;
+                g_SC55Underruns = 0;
 }
 }
 
@@ -186,6 +181,8 @@ CSC55Synth::CSC55Synth(
         : CSynthBase(nSampleRate),
           m_pProducerTask(nullptr),
           m_bProducerRunning(false),
+          m_pResamplerModel(nullptr),
+          m_bOutputEnabled(false),
           m_bInitialized(false),
           m_Model(Model),
           m_nNativeSampleRate(
@@ -213,6 +210,15 @@ CSC55Synth::CSC55Synth(
 CSC55Synth::~CSC55Synth()
 {
         StopProducer();
+
+        if (m_pResamplerModel)
+        {
+                SRCTools::ResamplerModel::freeResamplerModel(
+                    *m_pResamplerModel,
+                    *this
+                );
+                m_pResamplerModel = nullptr;
+        }
 
         if (m_bInitialized)
                 SC55_HeadlessCloseAudio();
@@ -496,6 +502,20 @@ bool CSC55Synth::Initialize()
         // Pre-fill the native sample ring outside the audio render path.
         Pump(200000);
 
+        m_pResamplerModel =
+            &SRCTools::ResamplerModel::createResamplerModel(
+                *this,
+                static_cast<double>(m_nNativeSampleRate),
+                static_cast<double>(m_nSampleRate),
+                SRCTools::ResamplerModel::GOOD
+            );
+
+        LOGNOTE(
+            "Nuked-SC55 audio path: %u Hz to %u Hz",
+            m_nNativeSampleRate,
+            m_nSampleRate
+        );
+
         m_bProducerRunning = true;
 
         // Producer runs on the dedicated physical Core 3.
@@ -738,133 +758,137 @@ void CSC55Synth::Pump(size_t nMaxSteps)
 
 
 
-size_t CSC55Synth::Render(s16* pOutBuffer, size_t nFrames)
+void CSC55Synth::getOutputSamples(float* pOutBuffer, unsigned int nFrames)
 {
-        if (!m_bInitialized)
+        const float Scale = 1.0f / 32768.0f;
+
+        for (unsigned int i = 0; i < nFrames; ++i)
         {
-                memset(pOutBuffer, 0, nFrames * 2 * sizeof(s16));
-                return nFrames;
-        }
+                short left = 0;
+                short right = 0;
 
-        m_Lock.Acquire();
-
-        // Experimental block scheduler:
-        // advance the emulated SC-55 core continuously for this audio chunk,
-        // then consume the generated native samples below.
-        constexpr unsigned SC55StepsPerOutputFrame = 128;
-        for (size_t step = 0; step < nFrames * SC55StepsPerOutputFrame; ++step)
-                SC55_HeadlessRunStep();
-
-        static unsigned s_nAccumulator = 0;
-        static short s_LastLeft = 0;
-        static short s_LastRight = 0;
-
-        for (size_t i = 0; i < nFrames; ++i)
-        {
-                s_nAccumulator += m_nNativeSampleRate;
-
-                bool bGotSample = false;
-
-                while (s_nAccumulator >= m_nSampleRate)
+                if (!SC55RingPop(left, right))
                 {
-                        short left = s_LastLeft;
-                        short right = s_LastRight;
-
-                        if (!SC55_HeadlessPopSample(&left, &right))
-                        {
-                                left = s_LastLeft;
-                                right = s_LastRight;
-                        }
-
-                        s_LastLeft = left;
-                        s_LastRight = right;
-                        bGotSample = true;
-
-                        s_nAccumulator -= m_nSampleRate;
+                        ++g_SC55Underruns;
+                        m_bOutputEnabled = false;
                 }
 
-                (void)bGotSample;
-
-                pOutBuffer[i * 2 + 0] = static_cast<s16>((s_LastLeft * m_nVolume) / 100);
-                pOutBuffer[i * 2 + 1] = static_cast<s16>((s_LastRight * m_nVolume) / 100);
+                pOutBuffer[i * 2 + 0] = static_cast<float>(left) * Scale;
+                pOutBuffer[i * 2 + 1] = static_cast<float>(right) * Scale;
         }
-
-        m_Lock.Release();
-
-        return nFrames;
 }
 
-size_t CSC55Synth::Render(float* pOutBuffer, size_t nFrames)
+
+size_t CSC55Synth::Render(s16* pOutBuffer, size_t nFrames)
 {
-        if (!m_bInitialized)
+        if (!pOutBuffer)
+                return nFrames;
+
+        if (!m_bInitialized || !m_pResamplerModel)
         {
-                memset(pOutBuffer, 0, nFrames * 2 * sizeof(float));
+                memset(pOutBuffer, 0, nFrames * 2 * sizeof(*pOutBuffer));
                 return nFrames;
         }
 
-        // Experimental underrun protection.
-        // Start consuming only after the native ring has a useful prebuffer.
-        // Stop consuming again if it drops too low.
         constexpr size_t StartThreshold = 4096;
         constexpr size_t StopThreshold = 1024;
 
-        static bool s_bOutputEnabled = false;
-
-        if (!s_bOutputEnabled)
+        if (!m_bOutputEnabled)
         {
                 if (SC55RingCount() >= StartThreshold)
-                {
-                        s_bOutputEnabled = true;
-                }
+                        m_bOutputEnabled = true;
                 else
                 {
-                        memset(pOutBuffer, 0, nFrames * 2 * sizeof(float));
+                        memset(pOutBuffer, 0, nFrames * 2 * sizeof(*pOutBuffer));
                         return nFrames;
                 }
         }
         else if (SC55RingCount() < StopThreshold)
         {
-                s_bOutputEnabled = false;
+                m_bOutputEnabled = false;
                 ++g_SC55Underruns;
-                memset(pOutBuffer, 0, nFrames * 2 * sizeof(float));
+                memset(pOutBuffer, 0, nFrames * 2 * sizeof(*pOutBuffer));
                 return nFrames;
         }
 
-        for (size_t i = 0; i < nFrames; ++i)
+        float ConversionBuffer[ConversionBufferFrames * 2];
+        size_t nRendered = 0;
+        const float Volume = m_nVolume / 100.0f;
+
+        while (nRendered < nFrames)
         {
-                g_SC55ResampleAccumulator += m_nNativeSampleRate;
+                size_t nChunk = nFrames - nRendered;
+                if (nChunk > ConversionBufferFrames)
+                        nChunk = ConversionBufferFrames;
 
-                while (g_SC55ResampleAccumulator >= m_nSampleRate)
+                m_pResamplerModel->getOutputSamples(
+                    ConversionBuffer,
+                    static_cast<unsigned int>(nChunk)
+                );
+
+                for (size_t i = 0; i < nChunk * 2; ++i)
                 {
-                        short left = g_SC55LastLeft;
-                        short right = g_SC55LastRight;
+                        float sample = ConversionBuffer[i] * Volume;
+                        if (sample > 1.0f) sample = 1.0f;
+                        if (sample < -1.0f) sample = -1.0f;
 
-                        if (SC55RingPop(left, right))
-                        {
-                                g_SC55LastLeft = left;
-                                g_SC55LastRight = right;
-                        }
-                        else
-                        {
-                                s_bOutputEnabled = false;
-                                ++g_SC55Underruns;
-                                break;
-                        }
+                        const float scaled = sample >= 0.0f
+                            ? sample * 32767.0f
+                            : sample * 32768.0f;
 
-                        g_SC55ResampleAccumulator -= m_nSampleRate;
+                        pOutBuffer[nRendered * 2 + i] = static_cast<s16>(scaled);
                 }
 
-                pOutBuffer[i * 2 + 0] = (g_SC55LastLeft / 32768.0f) * (m_nVolume / 100.0f);
-                pOutBuffer[i * 2 + 1] = (g_SC55LastRight / 32768.0f) * (m_nVolume / 100.0f);
+                nRendered += nChunk;
         }
 
         return nFrames;
 }
 
 
+size_t CSC55Synth::Render(float* pOutBuffer, size_t nFrames)
+{
+        if (!pOutBuffer)
+                return nFrames;
 
+        if (!m_bInitialized || !m_pResamplerModel)
+        {
+                memset(pOutBuffer, 0, nFrames * 2 * sizeof(*pOutBuffer));
+                return nFrames;
+        }
 
+        constexpr size_t StartThreshold = 4096;
+        constexpr size_t StopThreshold = 1024;
 
+        if (!m_bOutputEnabled)
+        {
+                if (SC55RingCount() >= StartThreshold)
+                        m_bOutputEnabled = true;
+                else
+                {
+                        memset(pOutBuffer, 0, nFrames * 2 * sizeof(*pOutBuffer));
+                        return nFrames;
+                }
+        }
+        else if (SC55RingCount() < StopThreshold)
+        {
+                m_bOutputEnabled = false;
+                ++g_SC55Underruns;
+                memset(pOutBuffer, 0, nFrames * 2 * sizeof(*pOutBuffer));
+                return nFrames;
+        }
+
+        m_pResamplerModel->getOutputSamples(
+            pOutBuffer,
+            static_cast<unsigned int>(nFrames)
+        );
+
+        const float Volume = m_nVolume / 100.0f;
+        for (size_t i = 0; i < nFrames * 2; ++i)
+                pOutBuffer[i] *= Volume;
+
+        return nFrames;
+}
 
 
 void CSC55Synth::ReportStatus() const
