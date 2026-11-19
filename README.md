@@ -23,11 +23,19 @@ A Raspberry Pi 3 was tested during development, but it does not provide enough p
 
 Raspberry Pi 5 support has not been validated by this project.
 
-### Nuked-MT32 is incomplete upstream
+### Nuked-MT32 implementation status and native RV2 reverb
 
-Nuked-MT32 was released by its original developer as unfinished software. The original project does not emulate the MT-32 reverb chip because no decap of that chip is available.
+Nuked-MT32 remains a work in progress, but its upstream implementation now includes native emulation of the MT-32 RV2 reverb processor. This port uses the RV2 implementation developed by [nukeykt](https://github.com/nukeykt/Nuked-MT32), together with the corresponding external reverb ROM image.
 
-This port uses the Munt-based reverb implementation found in the [keithadler GitHub account](https://github.com/keithadler) development line as a practical substitute. Consequently, the MT-32 digital synthesis path is based on Nuked-MT32, while reverb is not a transistor-level emulation of the original MT-32 reverb chip.
+The previous Munt-derived external reverb path is no longer used by the Nuked-MT32 backend. Munt remains available as an independent synthesizer backend in the same firmware.
+
+Nuked-MT32 upstream primarily targets the second-generation MT-32, identified in this project as **MT-32 NEW**, using 2.xx Control ROMs. The NEW implementation is the current fidelity target for the low-level LA32, MCU, and RV2 emulation.
+
+Support for the first-generation MT-32, identified as **MT-32 OLD**, using 1.xx Control ROMs, is an experimental extension maintained by this project. It includes adaptations for the older ROM banking, LA32 register addressing, and model-specific reverb ROM.
+
+The OLD implementation is usable and has been tested on a Raspberry Pi 4, but it should not be expected to provide the same hardware fidelity as MT-32 NEW. Differences may remain in output level, PWM volume behavior, timing, and other model-specific hardware details. OLD support should be considered experimental unless and until the model is implemented or formally validated by the Nuked-MT32 upstream author, nukeykt.
+
+PWM output scaling from the NEW implementation is currently bypassed for MT-32 OLD because applying the same scaling produced an incorrect lower output level in hardware testing. This is a model-specific compatibility measure pending further documentation and validation.
 
 ### Nuked-SC55 performance work
 
@@ -39,7 +47,11 @@ The Raspberry Pi 4 port uses optimization work derived from the [J.C. Moyer Nuke
 - Added SC-55 MkI and SC-55 MkII model selection.
 - Added a dedicated producer path for Nuked-SC55 audio generation.
 - Added a bare-metal Nuked-MT32 backend.
-- Added native Nuked-MT32 audio rendering and resampling from 32 kHz to the configured system sample rate.
+- Integrated the native Nuked-MT32 RV2 reverb implementation.
+- Added automatic selection of model-specific OLD and NEW RV2 reverb ROMs.
+- Added experimental support for first-generation MT-32 1.xx Control ROMs.
+- Restored the upstream ring-modulation first-partial suppression required for correct timbre balance.
+- Added native Nuked-MT32 audio rendering and optional resampling from 32 kHz to the configured system sample rate.
 - Added MIDI short-message and SysEx handling for Nuked-MT32.
 - Added Nuked-MT32 master-volume control through Roland SysEx.
 - Added firmware LCD text, active-part indicators, and nine-part level meters for Nuked-MT32.
@@ -87,6 +99,8 @@ A typical card layout is:
 |-- overlays/
 |-- roms/
 |   |-- pcm_mt32.rom
+|   |-- mt32_reverb_old.bin
+|   |-- mt32_reverb_new.bin
 |   |-- mt32_1_04_control.rom
 |   |-- mt32_1_05_control.rom
 |   |-- mt32_1_06_control.rom
@@ -175,7 +189,7 @@ The exact MkI firmware revision depends on the legally obtained ROM images suppl
 
 ## Nuked-MT32 ROM files
 
-Nuked-MT32 uses one shared MT-32 PCM ROM and one selected Control ROM.
+Nuked-MT32 uses one shared MT-32 PCM ROM, one selected Control ROM, and the RV2 reverb ROM corresponding to the selected MT-32 generation.
 
 ### Shared PCM ROM
 
@@ -210,6 +224,39 @@ MT-32 2.xx Control ROM: 131072 bytes
 
 The scanner validates ROM identity from the recognized ROM content. The filenames above are the recommended convention for organization, but a correctly named file with invalid content will not be accepted as the requested version.
 
+### Native RV2 reverb ROMs
+
+The OLD and NEW MT-32 generations use different RV2 reverb ROM images. Both files should preferably be stored in the `roms` directory. For compatibility, the firmware also checks the SD-card root:
+
+| MT-32 generation | Original ROM filename | Required filename |
+| --- | --- | --- |
+| MT-32 OLD, Control ROM 1.xx | `r15179857.ic13.bin` | `mt32_reverb_old.bin` |
+| MT-32 NEW, Control ROM 2.xx | `r15179917.ic19.bin` | `mt32_reverb_new.bin` |
+
+Expected size for each file:
+
+```text
+32768 bytes
+```
+
+Required SD-card paths:
+
+```text
+roms/mt32_reverb_old.bin
+roms/mt32_reverb_new.bin
+```
+
+The firmware selects the reverb ROM automatically:
+
+```text
+MT-32 1.xx -> mt32_reverb_old.bin
+MT-32 2.xx -> mt32_reverb_new.bin
+```
+
+The old generic filename `mt32_reverb.bin` is no longer used. Separate filenames prevent an OLD reverb ROM from being paired accidentally with a NEW Control ROM, or vice versa.
+
+Original ROM filenames are provided only to help identify dumps obtained legally from hardware owned by the user. ROM images are not distributed with this project.
+
 Munt may also use CM-32L, CM-64, or LAPC-I compatible ROM sets. This is one reason Munt remains available alongside Nuked-MT32.
 
 ## Configuration
@@ -238,16 +285,17 @@ new
 cm32l
 ```
 
-Munt and Nuked-MT32 use independent ROM selections. For example, Munt can use `cm32l` while Nuked-MT32 uses firmware `1.04`.
+Munt and Nuked-MT32 use independent ROM selections. For example, Munt can use `cm32l` while Nuked-MT32 uses firmware `2.07`.
+
+For Nuked-MT32, 2.xx firmware represents the primary NEW-model fidelity target. The 1.xx selections enable the experimental OLD-model implementation.
 
 ### Nuked-MT32
 
 ```ini
 [nuked_mt32]
 midi_channels = standard
-rom_set = 1.04
+rom_set = 2.07
 reversed_stereo = off
-reverb = on
 ```
 
 Valid exact firmware selections are:
@@ -276,11 +324,7 @@ reversed_stereo = off  Keep the native MT-32 output orientation
 reversed_stereo = on   Swap the final left and right output channels
 ```
 
-Reverb modes:
-```text
-reverb = on   Enable Nuked-MT32 reverb processing
-reverb = off  Disable Nuked-MT32 reverb processing
-```
+Native RV2 reverb is part of the Nuked-MT32 low-level emulation and is not controlled by the previous external `reverb = on` or `reverb = off` option.
 
 When selected, the display reports the actual recognized Control ROM, for example:
 
@@ -329,6 +373,22 @@ gain = 0.2
 reverb = on
 chorus = on
 ```
+
+### Large SoundFont warning
+
+SoundFonts larger than approximately 60 MB may fail to load, substantially increase boot time, or cause the system to stop responding during startup.
+
+The result can depend on the SoundFont, its internal structure, the available memory, and the specific Raspberry Pi 4 model. In some configurations, a large SoundFont may prevent the normal boot process from completing or may cause the Raspberry Pi 4 to freeze.
+
+This limitation is still under investigation. If startup becomes unusually slow, FluidSynth fails to initialize, or the system freezes during boot, test again with a smaller SoundFont, preferably below 60 MB.
+
+## Resampling and timing-sensitive backends
+
+For the lowest latency and most predictable timing, avoiding resampling is recommended whenever the audio output device supports the native sample rate of the selected backend.
+
+This recommendation is especially important for Nuked-SC55, which is more sensitive to timing and processing delays. Resampling adds processing cost and buffering and may increase latency or interfere with consistent real-time operation on heavily loaded Raspberry Pi 4 configurations.
+
+When troubleshooting delayed MIDI response, timing instability, audio-buffer underruns, or playback slowdown, test first with resampling disabled.
 
 ## Selecting modules
 
@@ -414,7 +474,7 @@ This development branch includes integration work for newer project revisions th
 - FluidSynth 2.6.1
 - Munt 2.8.2
 
-Circle provides the Raspberry Pi bare-metal runtime, drivers, multicore support, filesystems, USB, audio, and other platform services. FluidSynth provides SoundFont synthesis. Munt provides the established MT-32 family emulation backend and also supplies the reverb implementation used as a substitute by this Nuked-MT32 port.
+Circle provides the Raspberry Pi bare-metal runtime, drivers, multicore support, filesystems, USB, audio, and other platform services. FluidSynth provides SoundFont synthesis. Munt provides the established MT-32 family emulation backend. Nuked-MT32 now uses the native RV2 reverb implementation from its own upstream project.
 
 Because these components are included as submodules or imported components, the exact commit recorded by the checked-out branch is authoritative for a reproducible build:
 
@@ -427,8 +487,12 @@ git submodule status
 - Raspberry Pi 4 is the supported and validated target for the complete integration.
 - Raspberry Pi 3 does not have enough processing performance for reliable Nuked-SC55 operation in this port.
 - Raspberry Pi 5 has not been validated by this project.
-- Nuked-MT32 remains incomplete because the original MT-32 reverb chip has not been decapped and is not emulated by the upstream project.
-- Nuked-MT32 uses a Munt-derived reverb implementation as a substitute.
+- Nuked-MT32 remains work in progress even though native RV2 reverb emulation is now integrated.
+- MT-32 NEW with 2.xx Control ROMs is the current Nuked-MT32 fidelity target.
+- MT-32 OLD with 1.xx Control ROMs is an experimental extension and should not be expected to match original OLD hardware with the same fidelity.
+- PWM output scaling is bypassed for MT-32 OLD pending model-specific documentation and validation.
+- SoundFonts larger than approximately 60 MB may load slowly, fail to initialize, or freeze some Raspberry Pi 4 configurations; this remains under investigation.
+- Resampling may add latency and processing overhead, particularly with the timing-sensitive Nuked-SC55 backend.
 - Nuked-SC55 and Nuked-MT32 require user-supplied ROMs that must be legally obtained.
 - Low-level emulation is sensitive to CPU load, power quality, cooling, and audio-buffer timing.
 - A MiSTer user-port HAT that was sufficient for a Raspberry Pi 3 may not provide a reliable power path for a Raspberry Pi 4.
@@ -447,8 +511,11 @@ git submodule status
 
 - Confirm that `pcm_mt32.rom` is present.
 - Confirm that the exact Control ROM selected by `rom_set` is present.
-- Verify that the selected value is one of the seven supported versions.
-- Do not expect a missing version to fall back silently to another revision.
+- Confirm that `mt32_reverb_old.bin` is present when selecting a 1.xx Control ROM.
+- Confirm that `mt32_reverb_new.bin` is present when selecting a 2.xx Control ROM.
+- Verify that each reverb ROM is exactly 32768 bytes.
+- Verify that the selected Control ROM value is one of the seven supported versions.
+- Do not expect a missing Control ROM or reverb ROM to fall back silently to another model.
 
 ### The selected Nuked-MT32 version is incorrect
 
@@ -496,8 +563,8 @@ Special thanks to:
 - [Dale Whinham](https://github.com/dwhinham), creator of mt32-pi, and everyone who contributed to the original project. mt32-pi provides the architecture, bare-metal integration, user interface, configuration system, MIDI support, display support, MiSTer integration, and the foundation on which this work is built.
 - [nukeykt](https://github.com/nukeykt), creator of Nuked-SC55 and Nuked-MT32, for the extensive reverse-engineering work and for releasing both emulator codebases.
 - [J.C. Moyer](https://github.com/jcmoyer), whose Nuked-SC55 fork and optimization work made the Raspberry Pi 4 SC-55 integration practical.
-- [Keith Adler](https://github.com/keithadler), whose Nuked-MT32 development line provided the Munt-based reverb approach used by this port.
-- The [Munt project](https://github.com/munt/munt) contributors for MT-32 family emulation and the reverb implementation used by this Nuked-MT32 integration.
+- [Keith Adler](https://github.com/keithadler), whose Nuked-MT32 development line contributed cross-platform, frontend, rendering, and testing work used during earlier stages of this port.
+- The [Munt project](https://github.com/munt/munt) contributors for the established MT-32 family emulation backend retained by mt32-pi-nuked.
 - The [FluidSynth project](https://github.com/FluidSynth/fluidsynth) contributors for the SoundFont synthesizer used by mt32-pi.
 - The [Circle project](https://github.com/rsta2/circle) and circle-stdlib contributors for the Raspberry Pi bare-metal environment.
 - Everyone who tested firmware images, reported regressions, documented hardware behavior, and compared emulation with original sound modules.
@@ -510,7 +577,7 @@ Please also consult the acknowledgment and license sections of every upstream re
 - [Original Nuked-SC55 project](https://github.com/nukeykt/Nuked-SC55)
 - [J.C. Moyer Nuked-SC55 fork](https://github.com/jcmoyer/Nuked-SC55)
 - [Original Nuked-MT32 project](https://github.com/nukeykt/Nuked-MT32)
-- [Keith Adler GitHub account](https://github.com/keithadler)
+- [Keith Adler Nuked-MT32 fork](https://github.com/keithadler/Nuked-MT32)
 - [Munt](https://github.com/munt/munt)
 - [FluidSynth](https://github.com/FluidSynth/fluidsynth)
 - [Circle](https://github.com/rsta2/circle)
