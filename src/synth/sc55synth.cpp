@@ -50,7 +50,7 @@ extern "C"
 namespace
 {
         constexpr size_t SC55RingFrames = 131072;
-        constexpr size_t SC55PrebufferFrames = 32768;
+        constexpr size_t SC55PrebufferFrames = 512;
 
         short g_SC55RingLeft[SC55RingFrames];
         short g_SC55RingRight[SC55RingFrames];
@@ -790,8 +790,8 @@ size_t CSC55Synth::Render(s16* pOutBuffer, size_t nFrames)
                 return nFrames;
         }
 
-        constexpr size_t StartThreshold = 4096;
-        constexpr size_t StopThreshold = 1024;
+        constexpr size_t StartThreshold = 128;
+        constexpr size_t StopThreshold = 32;
 
         if (!m_bOutputEnabled)
         {
@@ -857,8 +857,8 @@ size_t CSC55Synth::Render(float* pOutBuffer, size_t nFrames)
                 return nFrames;
         }
 
-        constexpr size_t StartThreshold = 4096;
-        constexpr size_t StopThreshold = 1024;
+        constexpr size_t StartThreshold = 128;
+        constexpr size_t StopThreshold = 32;
 
         if (!m_bOutputEnabled)
         {
