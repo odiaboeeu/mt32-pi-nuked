@@ -1,5 +1,48 @@
 # Changelog
 
+## v1.1.0 - 2026-11-23
+
+### Nuked-MT32
+
+- Replaced the previous external Munt-derived reverb path with nukeykt's native RV2 implementation.
+- Added automatic model-specific RV2 ROM selection:
+  - MT-32 OLD: `r15179857.ic13.bin` renamed to `roms/mt32_reverb_old.bin`.
+  - MT-32 NEW: `r15179917.ic19.bin` renamed to `roms/mt32_reverb_new.bin`.
+- Restored the upstream ring-modulation first-partial suppression, correcting the excessive OVER DRIVE guitar level in *Creatures In The Depth*.
+- Included the upstream PWM, accumulator-clamping, and completed-output-bank corrections.
+- Kept MT-32 NEW (2.xx Control ROMs) as the fidelity target.
+- Kept MT-32 OLD (1.xx Control ROMs) experimental; unvalidated NEW-model PWM output scaling remains bypassed for OLD.
+
+### Nuked-SC55 latency reduction
+
+- Reduced the native SC-55 producer queue from 32,768 to 512 frames.
+- Reduced the start/restart threshold from 4,096 to 128 frames.
+- Reduced the stop/rebuffer threshold from 1,024 to 32 frames.
+- Tested on Raspberry Pi 4 through I2S at 48 kHz with an audio chunk size of 64 frames.
+- Validated both SC-55 MkI and MkII with no observed underruns or audio regressions.
+- Confirmed module switching between Munt, FluidSynth, Nuked-SC55, and Nuked-MT32.
+
+#### Calculated buffering comparison with I2S chunk size 64
+
+The I2S chunk contributes approximately 1.33 ms at 48 kHz (`64 / 48000`). The figures below combine one I2S chunk with the configured native SC-55 producer queue. They are calculated buffering estimates, not end-to-end latency measurements; resampler, driver, DAC, MIDI transport, and scheduling latency are not included.
+
+| Model | Native rate | v1.0.0 queue + I2S chunk | v1.1.0 queue + I2S chunk | Reduction |
+| --- | ---: | ---: | ---: | ---: |
+| SC-55 MkI | 64,000 Hz | 513.33 ms | 9.33 ms | 504.00 ms (98.2%) |
+| SC-55 MkII | 66,207 Hz | 496.26 ms | 9.07 ms | 487.20 ms (98.2%) |
+
+The start/restart gate was also reduced:
+
+| Model | v1.0.0 start threshold | v1.1.0 start threshold |
+| --- | ---: | ---: |
+| SC-55 MkI | 64.00 ms | 2.00 ms |
+| SC-55 MkII | 61.87 ms | 1.93 ms |
+
+### Runtime guidance
+
+- SoundFonts larger than approximately 60 MB may load slowly, fail to initialize, or freeze some Raspberry Pi 4 configurations; this remains under investigation.
+- Avoiding additional resampling is recommended when the audio hardware supports the backend's native rate, especially for timing-sensitive Nuked-SC55 operation.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
